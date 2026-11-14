@@ -1,0 +1,50 @@
+// Server riêng cho "Duy Anh Battle"
+// Phát file game + chạy server online (WebSocket tại /ws). Không cần cài thêm thư viện.
+// Chạy: node server.js  (mặc định cổng 3000)
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+const gameServer = require('./game-server');
+const PORT = process.env.PORT || 3000;
+const ROOT = __dirname;
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml',
+  '.mp3': 'audio/mpeg', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
+};
+
+const server = http.createServer((req, res) => {
+  let url;
+  try { url = decodeURIComponent((req.url || '/').split('?')[0]); }
+  catch (e) { res.writeHead(400); return res.end('Bad request'); }   // URL hỏng không được làm sập server
+  if (url === '/healthz') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(Object.assign({ ok: true }, gameServer.stats()))); }
+  if (url === '/') url = '/index.html';
+  const file = path.normalize(path.join(ROOT, url));
+  // chỉ cho phép đọc index.html và thư mục assets
+  const okPath = file === path.join(ROOT, 'index.html') || file.startsWith(path.join(ROOT, 'assets') + path.sep);
+  if (!okPath) { res.writeHead(404); return res.end('Not found'); }
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) { res.writeHead(404); return res.end('Not found'); }
+    const ext = path.extname(file).toLowerCase();
+    const headers = {
+      'Content-Type': TYPES[ext] || 'application/octet-stream',
+      'Cache-Control': ext === '.html' ? 'no-cache' : ext === '.mp3' ? 'public, max-age=86400' : 'public, max-age=3600',
+      'Accept-Ranges': 'bytes',
+    };
+    // iPhone/Safari bắt buộc server hỗ trợ "Range" thì mới phát được nhạc
+    const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (m && (m[1] || m[2])) {
+      let start = m[1] ? parseInt(m[1], 10) : Math.max(0, st.size - parseInt(m[2], 10));
+      let end = m[1] && m[2] ? parseInt(m[2], 10) : st.size - 1;
+      if (end >= st.size) end = st.size - 1;
+      if (start > end || start >= st.size) { res.writeHead(416, { 'Content-Range': 'bytes */' + st.size }); return res.end(); }
+      res.writeHead(206, Object.assign(headers, { 'Content-Range': 'bytes ' + start + '-' + end + '/' + st.size, 'Content-Length': end - start + 1 }));
+      return fs.createReadStream(file, { start, end }).pipe(res);
+    }
+    res.writeHead(200, Object.assign(headers, { 'Content-Length': st.size }));
+    fs.createReadStream(file).pipe(res);
+  });
+});
+gameServer.attach(server);
+server.listen(PORT, () => console.log('Game đang chạy tại http://localhost:' + PORT));

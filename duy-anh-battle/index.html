@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="vi"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2b86b0">
+  <title>Duy Anh Battle</title>
+  <meta name="description" content="Duy Anh Battle – game bắn bong bóng nhìn từ trên xuống, chơi ngay trên trình duyệt.">
+  <link rel="manifest" href="./assets/manifest.json">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Duy Anh Battle">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="./assets/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com/">
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+  <link href="./assets/css2" rel="stylesheet" media="all" onload="this.media=&#39;all&#39;">
+  <link rel="stylesheet" href="./assets/style.css?v=1">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ========== MÀN CHÍNH ========== -->
+  <section id="scr-main" class="screen hidden">
+    <div class="card hero">
+      <h1 class="logo"><span>Duy Anh</span><span>Battle</span></h1>
+      <p class="tag">Bắn bong bóng cùng Duy Anh</p>
+      <div class="btn-col">
+        <button class="btn big primary" data-act="offline">🤖 Chơi với Bot</button>
+        <button class="btn big cup" data-act="cup">🏆 Giải đấu</button>
+        <button class="btn big online" data-act="online">🌐 Chơi online</button>
+        <button class="btn" data-act="wardrobe">👕 Tủ đồ</button>
+        <button class="btn vip" data-act="vip">👑 Tủ đồ VIP (đổi áo, quần)</button>
+        <div class="btn-row tight even"><button class="btn" data-act="help">📖 Hướng dẫn</button><button class="btn" data-act="settings">⚙️ Cài đặt</button></div>
+        <button class="btn ghost" id="btn-sound">🔊 Âm thanh: Bật</button>
+      </div>
+      <p class="stats" id="main-stats">Thắng 0 · Thua 0</p>
+    </div>
+  </section>
+
+  <!-- ========== CHUẨN BỊ TRẬN (OFFLINE) ========== -->
+  <section id="scr-setup" class="screen hidden">
+    <div class="card setup">
+      <header class="setup-head">
+        <button class="btn tiny ghost" data-act="back-main">← Menu</button>
+        <h2>Chuẩn bị trận đấu</h2>
+        <span class="setup-wins" id="setup-wins">🏆 0 thắng · 0 thua</span>
+      </header>
+      <div class="setup-body">
+        <aside class="setup-hero">
+          <div class="hero-stage">
+            <canvas id="setup-canvas"></canvas>
+            <div id="setup-hero-pic" class="hero-pic hidden"></div>
+          </div>
+          <div class="hero-name" id="setup-hero-name">Kiều Anh</div>
+          <div class="hero-tag" id="setup-hero-tag">Công chúa xinh xinh</div>
+          <button class="btn hero-wd" data-act="wardrobe">👕 Tùy chỉnh trang phục</button>
+          <h3>Chọn nhân vật</h3>
+          <div class="char-grid avatar-grid" id="setup-chars"></div>
+        </aside>
+        <div class="setup-main">
+          <section class="panel opts">
+            <h3>Trận đấu</h3>
+            <div class="opt-row"><span class="opt-l">Chế độ</span>
+              <div class="seg" id="setup-mode"><button data-v="1" class="sel">👤 Đấu đơn</button><button data-v="2">👥 Đấu đôi (cùng bot)</button></div></div>
+            <div class="opt-row"><span class="opt-l">Đối thủ</span>
+              <div class="seg level-cards" id="setup-level">
+                <button data-v="rookie"><b>🌱 Tập sự</b><small>Ngắm lệch, phản xạ chậm</small></button>
+                <button data-v="pro" class="sel"><b>⭐ Chuyên nghiệp</b><small>Biết né đạn, hay dùng ná</small></button>
+                <button data-v="ace"><b>🔥 Cao thủ</b><small>Né nhạy, ná xuyên tường</small></button>
+              </div></div>
+            <div class="opt-row"><span class="opt-l">Thể thức</span>
+              <div><div class="seg" id="setup-bo"><button data-v="1" class="sel">1 hiệp</button><button data-v="3">Thắng 2/3 hiệp</button></div>
+              <p class="note">Mỗi người 100 máu. Hết máu trước thì thua hiệp.</p></div></div>
+          </section>
+          <section class="panel venues">
+            <div class="row-between"><h3>Bản đồ</h3><span class="venue-info" id="setup-venue-info"></span></div>
+            <div class="venue-list" id="setup-venue"></div>
+          </section>
+        </div>
+      </div>
+      <footer class="setup-foot">
+        <div class="summary" id="setup-summary"><span class="chip">Kiều Anh</span><span class="chip">Đánh đơn</span><span class="chip">Chuyên nghiệp</span><span class="chip">Chạm 7</span><span class="chip">Truyền thống</span><span class="chip">Nhà thi đấu Hoa Mai</span></div>
+        <button class="btn big primary" id="btn-start">▶ Bắt đầu!</button>
+      </footer>
+    </div>
+  </section>
+
+  <!-- ========== GIẢI ĐẤU ========== -->
+  <section id="scr-cup" class="screen hidden">
+    <div class="card wide scroll">
+      <div class="row-between">
+        <h2 id="cup-title">Giải đấu</h2>
+        <span class="pill" id="cup-cabinet" title="Tủ cúp"></span>
+      </div>
+      <p class="note" id="cup-status"></p>
+      <div class="cup-tiers" id="cup-tiers"></div>
+      <div id="cup-view" class="hidden">
+        <div class="cup-bracket" id="cup-bracket"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost" id="cup-back">← Menu</button>
+        <button class="btn ghost" id="cup-quit">Bỏ giải</button>
+        <button class="btn big primary" id="cup-play">▶ Thi đấu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== HƯỚNG DẪN ========== -->
+  <section id="scr-help" class="screen hidden">
+    <div class="card wide scroll">
+      <h2>Hướng dẫn</h2>
+      <table class="keys">
+        <tr><th>Hành động</th><th>Bàn phím + chuột</th><th>Tay cầm</th><th>Điện thoại</th></tr>
+        <tr><td>Di chuyển</td><td>W A S D</td><td>Cần trái</td><td>Cần trái</td></tr>
+        <tr><td>Ngắm</td><td>Di chuột (hoặc ← ↑ → ↓)</td><td>Cần phải</td><td>Cần phải</td></tr>
+        <tr><td>Bắn</td><td>Bấm chuột / Space / J</td><td>RT / RB</td><td>Giữ cần phải</td></tr>
+        <tr><td>Đổi súng</td><td>Q, chuột phải, 1 / 2</td><td>Y / LB</td><td>Nút 🔁</td></tr>
+        <tr><td>Tạm dừng</td><td>Esc / P</td><td>Start</td><td>⏸</td></tr>
+      </table>
+      <ul class="rules">
+        <li><b>Mục tiêu:</b> mỗi người có <b>100 máu</b>. Ai hết máu trước thì thua hiệp. Đấu đôi: đội nào hết sạch người thì thua.</li>
+        <li><b>🫧 Súng trường bong bóng:</b> bắn 1 viên / 0,5 giây, băng 5 viên rồi nạp 1,5 giây. Mỗi viên mất <b>10 máu</b>. Đạn <b>không xuyên vật cản</b> nhưng <b>nảy tối đa 5 lần</b> vào tường và chướng ngại vật – hãy bắn vòng!</li>
+        <li><b>🎯 Ná bắn tỉa:</b> 1 phát / giây, <b>xuyên qua mọi vật thể</b> và mọi kẻ địch trên đường bắn, mất <b>50 máu</b>. Bắn được cả khi đối thủ nấp sau tường.</li>
+        <li><b>Vật phẩm:</b> cứ mỗi 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân. Chạy qua để nhặt:
+          <br>❤️ <b>Hồi máu</b> +10 · 💪 <b>Sức mạnh</b> +10 sát thương mỗi phát (cộng dồn) · 🛡️ <b>Khiên</b> miễn sát thương 2 giây · ❄️ <b>Đóng băng</b> đối thủ đứng im, không bắn được 2 giây.</li>
+        <li><b>Đạn của đồng đội:</b> bay xuyên qua nhau, không gây sát thương cho đồng đội.</li>
+        <li><b>Thể thức:</b> 1 hiệp hoặc thắng 2/3 hiệp. Giải đấu 8 người: tứ kết, bán kết, chung kết (chung kết đấu 2/3).</li>
+        <li><b>Online:</b> ghép nhanh, tạo phòng bằng mã 4 ký tự, xem trực tiếp, chat. Mất mạng trong trận được chờ 30 giây.</li>
+      </ul>
+      <div class="btn-row"><button class="btn primary" data-act="back-main">Đã hiểu!</button></div>
+    </div>
+  </section>
+
+  <!-- ========== TỦ ĐỒ ========== -->
+  <section id="scr-wardrobe" class="screen hidden">
+    <div class="card wide wardrobe">
+      <div class="wd-left">
+        <canvas id="wardrobe-canvas"></canvas>
+        <div class="wd-name" id="wd-name"></div>
+        <div class="seg small" id="wd-anim"><button data-v="ready" class="sel">Đứng</button><button data-v="swing">Vung vợt</button><button data-v="celebrate">Ăn mừng</button></div>
+      </div>
+      <div class="wd-right scroll">
+        <h2>Tủ đồ</h2>
+        <h3>Nhân vật</h3>
+        <div class="char-grid mini" id="wd-chars"></div>
+        <div id="wd-colors"></div>
+        <h3>Kiểu áo</h3>
+        <div class="seg" id="wd-shirtstyle"></div>
+        <h3>Số áo</h3>
+        <div class="row-gap"><input type="number" id="wd-number" min="0" max="99" class="num-input"></div>
+        <h3>Họa tiết mặt vợt (chỉ hiện trong tủ đồ)</h3>
+        <div class="seg" id="wd-pattern"></div>
+        <h3>Phụ kiện đầu</h3>
+        <div class="acc-grid" id="wd-acc"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="wd-reset">↺ Mặc định</button>
+          <button class="btn ghost" id="wd-random">🎲 Ngẫu nhiên</button>
+          <button class="btn big primary" id="wd-done">Xong</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TỦ ĐỒ VIP (thay KIT bằng ảnh của bạn) ========== -->
+  <section id="scr-vip" class="screen hidden">
+    <div class="card wide wardrobe">
+      <div class="wd-left">
+        <canvas id="vip-canvas"></canvas>
+        <div class="wd-name" id="vip-name"></div>
+        <div class="seg small" id="vip-anim"><button data-v="ready" class="sel">Đứng</button><button data-v="swing">Vung vợt</button><button data-v="celebrate">Ăn mừng</button></div>
+      </div>
+      <div class="wd-right scroll">
+        <h2>👑 Tủ đồ VIP</h2>
+        <p class="vip-hint">Đưa ảnh KIT áo, quần, vợt vào để thay đồ cho nhân vật, giống thay kit trong Dream League Soccer. Ảnh chỉ lưu trên máy này.</p>
+        <h3>Nhân vật</h3>
+        <div class="char-grid mini" id="vip-chars"></div>
+        <h3>Áp dụng kit cho</h3>
+        <div class="seg" id="vip-scope"><button data-v="char">Nhân vật này</button><button data-v="all">Tất cả nhân vật</button></div>
+        <div id="vip-slots"></div>
+        <input type="file" id="vip-file" accept="image/*" class="hidden">
+        <div class="btn-row">
+          <button class="btn ghost" id="vip-clear">🗑 Xóa kit đang chọn</button>
+          <button class="btn big primary" id="vip-done">Xong</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ========== CÀI ĐẶT ========== -->
+  <section id="scr-settings" class="screen hidden dim">
+    <div class="card wide scroll">
+      <h2>Cài đặt</h2>
+      <div class="settings-grid">
+        <label>Chất lượng đồ họa
+          <div class="seg" id="set-quality"><button data-v="auto">Tự động</button><button data-v="low">Thấp</button><button data-v="medium">Vừa</button><button data-v="high">Cao</button></div>
+        </label>
+        <label class="check"><input type="checkbox" id="set-music"> 🎵 Nhạc nền</label>
+        <label class="check"><input type="checkbox" id="set-sfx"> 🔊 Âm thanh hiệu ứng (tiếng súng, bong bóng…)</label>
+        <label>Âm lượng chung <input type="range" id="set-volume" min="0" max="100" step="5"></label>
+        <label>Âm lượng nhạc nền <input type="range" id="set-musicvol" min="0" max="100" step="5"></label>
+        <label class="check"><input type="checkbox" id="set-aimline"> Hiện đường ngắm</label>
+        <label class="check"><input type="checkbox" id="set-shake"> Rung camera khi trúng đạn</label>
+      </div>
+      <div class="btn-row"><button class="btn primary" id="btn-settings-close">Xong</button></div>
+    </div>
+  </section>
+
+  <!-- ========== TẠM DỪNG ========== -->
+  <section id="scr-pause" class="screen dim hidden">
+    <div class="card">
+      <h2>Tạm dừng</h2>
+      <p class="note hidden" id="pause-online-note">Trận online vẫn đang diễn ra!</p>
+      <div class="btn-col">
+        <button class="btn big primary" id="btn-resume">▶ Tiếp tục</button>
+        <button class="btn" id="btn-restart">↻ Chơi lại</button>
+        <button class="btn" data-act="settings">⚙️ Cài đặt</button>
+        <button class="btn ghost" id="btn-quit">Về menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== KẾT THÚC ========== -->
+  <section id="scr-over" class="screen dim hidden">
+    <div class="card">
+      <h2 id="over-title">THUA RỒI! 😿</h2>
+      <p class="big-score" id="over-score">0 – 7</p>
+      <p class="note" id="over-reason"></p>
+      <p class="unlock hidden" id="over-unlock"></p>
+      <div class="btn-col">
+        <button class="btn big primary" id="btn-again">Đấu lại</button>
+        <button class="btn ghost" id="btn-over-menu">Về menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== HỒ SƠ ONLINE ========== -->
+  <section id="scr-profile" class="screen hidden">
+    <div class="card wide">
+      <h2>Hồ sơ online</h2>
+      <label class="field">Biệt danh (2–16 ký tự)
+        <input id="profile-name" maxlength="16" autocomplete="off" placeholder="VD: Tuấn Pickle">
+      </label>
+      <div class="row-between"><h3>Nhân vật</h3><button class="btn tiny" data-act="wardrobe">👕 Tùy chỉnh trang phục</button></div>
+      <div class="char-grid" id="profile-chars"></div>
+      <p class="note">Không cần đăng ký. Thành tích lưu theo trình duyệt này, xóa dữ liệu trình duyệt sẽ mất thành tích.</p>
+      <div class="btn-row">
+        <button class="btn ghost" data-act="back-main">← Quay lại</button>
+        <button class="btn big primary" id="btn-profile-ok">Vào sảnh</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SẢNH ONLINE ========== -->
+  <section id="scr-online" class="screen hidden">
+    <div class="card wide scroll">
+      <div class="row-between">
+        <h2>Sảnh online</h2>
+        <span class="pill" id="online-ping">● đang kết nối…</span>
+      </div>
+      <p class="me-line" id="online-me"></p>
+      <div class="grid2">
+        <div class="panel">
+          <h3>Tìm trận nhanh</h3>
+          <div class="btn-col">
+            <button class="btn primary" data-queue="1v1">⚡ Tìm trận 1v1</button>
+            <button class="btn primary" data-queue="2v2">⚡ Tìm trận 2v2</button>
+          </div>
+          <h3>Phòng riêng</h3>
+          <div class="btn-row tight">
+            <button class="btn" data-create="1v1">＋ Tạo phòng 1v1</button>
+            <button class="btn" data-create="2v2">＋ Tạo phòng 2v2</button>
+          </div>
+          <div class="join-row">
+            <input id="join-code" maxlength="4" placeholder="MÃ" autocomplete="off">
+            <button class="btn" id="btn-join">Vào phòng</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Xem trận</h3>
+          <div class="join-row">
+            <input id="watch-code" maxlength="4" placeholder="MÃ" autocomplete="off">
+            <button class="btn" id="btn-watch">👁 Xem trận</button>
+          </div>
+          <p class="note">Nhập mã phòng của trận đang đấu để xem trực tiếp.</p>
+          <div class="row-between"><h3>Bảng xếp hạng</h3><button class="btn tiny ghost" id="btn-live-refresh">↻</button></div>
+          <ol class="list lb" id="lb-list"><li class="muted">…</li></ol>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost" id="btn-online-back">← Menu</button>
+        <button class="btn ghost" id="btn-edit-profile">✎ Đổi hồ sơ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ĐANG TÌM TRẬN ========== -->
+  <section id="scr-queue" class="screen hidden">
+    <div class="card">
+      <h2 id="queue-title">Đang tìm trận…</h2>
+      <div class="spinner"></div>
+      <p class="big-score" id="queue-time">0:00</p>
+      <p class="note" id="queue-info"></p>
+      <button class="btn ghost" id="btn-queue-cancel">Hủy</button>
+    </div>
+  </section>
+
+  <!-- ========== PHÒNG CHỜ ========== -->
+  <section id="scr-room" class="screen hidden">
+    <div class="card wide scroll">
+      <div class="row-between">
+        <h2>Phòng <span class="code" id="room-code">----</span> <small id="room-mode"></small></h2>
+        <button class="btn tiny" id="btn-copy-link">🔗 Sao chép link mời</button>
+      </div>
+      <div class="grid2">
+        <div class="panel">
+          <div class="teams">
+            <div class="team team-a"><h3>Đội A</h3><ul id="room-team-A"></ul><button class="btn tiny ghost" data-team="A">Vào đội A</button></div>
+            <div class="team team-b"><h3>Đội B</h3><ul id="room-team-B"></ul><button class="btn tiny ghost" data-team="B">Vào đội B</button></div>
+          </div>
+          <h3>Cài đặt trận <small id="room-host-note"></small></h3>
+          <div class="settings">
+            <label>Bản đồ <select id="room-venue"></select></label>
+            <img id="room-venue-thumb" class="venue-thumb hidden" alt="">
+            <label>Thể thức <select id="room-bo"><option value="1">1 hiệp</option><option value="3">Thắng 2/3 hiệp</option></select></label>
+            <label id="room-fill-wrap" class="check"><input type="checkbox" id="room-fill"> Thêm bot vào chỗ trống
+              <select id="room-botlevel"><option value="rookie">Tập sự</option><option value="pro">Chuyên nghiệp</option><option value="ace">Cao thủ</option></select></label>
+          </div>
+        </div>
+        <div class="panel chat">
+          <h3>Chat</h3>
+          <div class="chat-log" id="chat-log"></div>
+          <form class="chat-form" id="chat-form"><input id="chat-input" maxlength="120" autocomplete="off" placeholder="Nhắn gì đó…"><button class="btn tiny">Gửi</button></form>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost" id="btn-room-leave">Rời phòng</button>
+        <button class="btn" id="btn-ready">Sẵn sàng</button>
+        <button class="btn big primary" id="btn-room-start">Bắt đầu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== HUD ========== -->
+  <div id="hud" class="hidden">
+    <div class="scoreboard">
+      <div class="side left"><span class="ava" id="hud-l-ava"></span><div class="hpcol"><span class="nm" id="hud-l-name">Bạn</span><div class="hpbar"><i id="hud-l-hp"></i><b id="hud-l-hpt">100</b></div></div><span class="sc" id="hud-l-score">0</span></div>
+      <div class="mid"><div id="hud-target">1 hiệp</div><div id="hud-wind">Hiệp 1</div></div>
+      <div class="side right"><span class="sc" id="hud-r-score">0</span><div class="hpcol r"><span class="nm" id="hud-r-name">Bot</span><div class="hpbar r"><i id="hud-r-hp"></i><b id="hud-r-hpt">100</b></div></div><span class="ava" id="hud-r-ava"></span></div>
+    </div>
+    <div id="hud-ping" class="pill small hidden"></div>
+    <button id="btn-pause" class="icon-btn" aria-label="Tạm dừng">⏸</button>
+    <div id="call" class=""><div id="call-main"></div><div id="call-sub"></div></div>
+    <div id="pop"></div>
+    <div id="msg"></div>
+    <div id="hint"></div>
+    <div id="floaters"></div>
+    <div id="tags"></div>
+    <div id="banner" class="hidden"></div>
+    <div id="fxbar"></div>
+    <div id="wpn">
+      <button class="w sel" id="w-rifle" data-w="rifle"><span class="ic">🫧</span><span class="wt"><b>Súng bong bóng</b><span class="pips" id="w-rifle-pips"></span></span><i class="cd" id="w-rifle-cd"></i></button>
+      <button class="w" id="w-sniper" data-w="sniper"><span class="ic">🎯</span><span class="wt"><b>Ná bắn tỉa</b><small>50 máu · xuyên vật</small></span><i class="cd" id="w-sniper-cd"></i></button>
+    </div>
+    <div id="legend"><span><b>Đi</b> WASD</span><span><b>Ngắm</b> chuột</span><span><b>Bắn</b> bấm chuột / Space</span><span><b>Đổi súng</b> Q / 1 / 2</span><span><b>Tạm dừng</b> Esc</span></div>
+  </div>
+
+  <!-- ========== CẢM ỨNG ========== -->
+  <div id="touch" class="hidden">
+    <div id="joy-zone"></div>
+    <div id="joy"><div id="joy-knob"></div></div>
+    <div id="aim-zone"></div>
+    <div id="aim"><div id="aim-knob"></div></div>
+    <button id="btn-swap" aria-label="Đổi súng">🔁</button>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+  <div id="loading" class="hidden"><div class="ld-box"><div class="spinner"></div><div id="loading-text">Đang chuẩn bị đồ họa…</div><div id="loading-sub"></div><button id="loading-reload" class="btn primary hidden" onclick="location.reload()">↻ Tải lại</button></div></div>
+  <script>
+    // Bắt lỗi xảy ra trước khi game khởi động xong để không bao giờ "treo im lặng"
+    window.PP_HTML_REV = 1;   // tăng khi đổi cấu trúc HTML mà game.js phụ thuộc
+    (function () {
+      function fail(msg) {
+        var l = document.getElementById('loading'); if (!l || l.classList.contains('hidden')) return;
+        document.getElementById('loading-text').textContent = 'Không khởi động được game 😢';
+        document.getElementById('loading-sub').textContent = msg;
+        document.getElementById('loading-reload').classList.remove('hidden');
+      }
+      window.__bootFail = fail;
+      window.addEventListener('error', function (e) { var t = e.target; if (t && t !== window && t.tagName !== 'SCRIPT') return; fail((e.message || 'Lỗi tải tài nguyên') + (e.filename ? ' (' + e.filename.split('/').pop().split('?')[0] + ')' : '')); }, true);
+      setTimeout(function () {
+        var l = document.getElementById('loading');
+        if (l && !l.classList.contains('hidden')) {
+          document.getElementById('loading-sub').textContent = 'Vẫn đang tải… Nếu quá lâu, hãy bật "Tăng tốc phần cứng" trong cài đặt trình duyệt rồi tải lại trang.';
+          document.getElementById('loading-reload').classList.remove('hidden');
+        }
+      }, 20000);
+    })();
+  </script>
+
+  <script src="./assets/three-r147.min.js"></script>
+  <script src="./assets/RoomEnvironment.js"></script>
+  <script src="./assets/config.js?v=1"></script>
+  <script src="./assets/shooter.js?v=1"></script>
+  <script src="./assets/ai.js?v=1"></script>
+  <script src="./assets/protocol.js?v=1"></script>
+  <script src="./assets/audio.js?v=1"></script>
+  <script src="./assets/kit.js?v=1"></script>
+  <script src="./assets/character.js?v=1"></script>
+  <script src="./assets/arena.js?v=1"></script>
+  <script src="./assets/input.js?v=1"></script>
+  <script src="./assets/net.js?v=1"></script>
+  <script src="./assets/ui.js?v=1"></script>
+  <script src="./assets/game.js?v=1"></script>
+</body></html>
