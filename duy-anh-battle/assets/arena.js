@@ -201,16 +201,30 @@
       } else {
         // vị trí người mình trong hệ toạ độ camera (z dương = phía sau lưng mình)
         let px = 0, pz = map.HW;
-        if (o.px != null) { _v.set(o.px, 0, o.pz); stage.localToWorld(_v); px = _v.x; pz = _v.z; }
+        if (o.px != null) {
+          // camera nhìn lệch về PHÍA TRƯỚC MẶT nhân vật (theo hướng ngắm): điểm nhìn = vị trí + hướng ngắm × độ dẫn,
+          // nên quay mặt về hướng nào thì thấy rõ phía đó, kể cả khi đang quay mặt về phía camera.
+          // Độ dẫn dọc (theo trục camera) lớn hơn độ dẫn ngang; màn dọc điện thoại dẫn ngang ít hơn vì khung hẹp.
+          let fx = o.px, fz = o.pz;
+          if (o.aim != null) {
+            const Lf = world.portrait ? 5.4 : 6, Ll = world.portrait ? 2.2 : 4;
+            const dx = Math.sin(o.aim), dz = Math.cos(o.aim), phi = stage.rotation.y, c = Math.cos(phi), sn = Math.sin(phi);
+            const wx = dx * c + dz * sn, wz = -dx * sn + dz * c;          // hướng ngắm trong hệ camera
+            const lcx = wx * Ll, lcz = wz * Lf;                            // độ dẫn trong hệ camera
+            fx = Math.max(-map.HW, Math.min(map.HW, o.px + (lcx * c - lcz * sn)));
+            fz = Math.max(-map.HD, Math.min(map.HD, o.pz + (lcx * sn + lcz * c)));
+          }
+          _v.set(fx, 0, fz); stage.localToWorld(_v); px = _v.x; pz = _v.z;
+        }
         const n = (portrait ? 8.4 : shortL ? 7.6 : 6.2) * K, a = (portrait ? 12.6 : shortL ? 13.1 : 12.4) * K, sb = (portrait ? 8.6 : 5.9) * K;
         // camera đi theo người mình cả chiều dọc lẫn ngang (giới hạn để không lòi ra ngoài sân quá xa)
-        const camZ = a + (pz + (portrait ? 2 : 0.9) * K - sb);
+        const camZ = a + (pz + 5 * K - sb);       // 5K: nhân vật nằm giữa khung khi nhìn về sau, thấp hơn khi nhìn về trước
         const ang = Math.atan2(n, a - sb) - (camera.fov / 2) * Math.PI / 180;
         const lookZ = camZ - n / Math.tan(Math.max(0.2, ang));
         const lim = map.HD + 2 * K;
-        const cx = Math.max(-lim, Math.min(lim, px * (portrait ? 0.7 : 0.85))), lx = Math.max(-lim, Math.min(lim, px * 0.85));
+        const cx = Math.max(-lim, Math.min(lim, px)), lx = cx;
         _t1.set(cx, n, camZ);
-        const k = snap ? 1 : 1 - Math.exp(-dt * 6);
+        const k = snap ? 1 : 1 - Math.exp(-dt * 4.5);
         if (snap) { camPos.copy(_t1); camLook.set(lx, 0, lookZ); }
         else { camPos.lerp(_t1, k); camLook.lerp(_v.set(lx, 0, lookZ), k); }
       }

@@ -490,7 +490,7 @@
     updateAimLine();
     // camera 3D kiểu Pickle Ball: sau vạch cuối sân của mình, bám theo nhân vật
     shake = Math.max(0, shake - dt * 3);
-    world.updateCamera(dt, { menu: mode === 'menu', t: time, px: me ? me.x : null, pz: me ? me.z : null, shake: shake * 0.3 });
+    world.updateCamera(dt, { menu: mode === 'menu', t: time, px: me ? me.x : null, pz: me ? me.z : null, aim: me && me.alive ? me.aim : null, shake: shake * 0.3 });
     document.body.classList.toggle('frozen-fx', !!(me && me.fr > 0 && me.alive));
   }
   /** Nền menu: hai nhân vật đứng bắn nước qua lại cho vui mắt */
