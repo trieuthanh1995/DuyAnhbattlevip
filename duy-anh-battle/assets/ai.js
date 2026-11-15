@@ -103,7 +103,7 @@
         this.aim = wrap(this.aim + Math.max(-maxTurn, Math.min(maxTurn, diff)));
         const aligned = Math.abs(wrap(want - this.aim)) < (sniper ? 0.04 : 0.1);
         const ready = this.seeT > L.react;
-        if (!frozen && aligned) {
+        if (aligned) {        // bị đóng băng vẫn bắn được
           if (sniper) fire = d < 36 && (los ? ready : true);       // ná xuyên vật: bắn cả khi bị che
           else fire = los && ready && p.ammo > 0 && d < 16;
         }

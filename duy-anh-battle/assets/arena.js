@@ -113,7 +113,7 @@
     x.beginPath(); x.moveTo(cv.width / 2, 0); x.lineTo(cv.width / 2, cv.height); x.stroke();
     x.beginPath(); x.arc(cv.width / 2, cv.height / 2, cell * 2.2, 0, Math.PI * 2); x.stroke();
     x.fillStyle = 'rgba(255,255,255,0.35)';
-    for (const sx of [-1, 1]) for (const sz of [-1.8, 1.8]) { x.beginPath(); x.arc(cv.width / 2 + sx * 9 * cell, cv.height / 2 + sz * cell, cell * 0.55, 0, Math.PI * 2); x.fill(); }
+    for (const sx of [-1, 1]) for (const sz of [-1.8, 1.8]) { x.beginPath(); x.arc(cv.width / 2 + sx * map.HW * cell, cv.height / 2 + sz * cell, cell * 0.55, 0, Math.PI * 2); x.fill(); }
     const tex = new T.CanvasTexture(cv); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
     return tex;
   }
@@ -127,8 +127,8 @@
     const camera = new T.PerspectiveCamera(38, 1, 0.5, 300);
     const hemi = new T.HemisphereLight(lin(0xffffff), lin(th.floor2), 0.5); scene.add(hemi);
     const sun = new T.DirectionalLight(lin(0xfff3e0), 0.95);
-    sun.position.set(-6, 22, 8); sun.target.position.set(0, 0, 0);
-    const sc = sun.shadow.camera; sc.left = -13; sc.right = 13; sc.top = 13; sc.bottom = -13; sc.near = 5; sc.far = 60;
+    sun.position.set(-6 * (map.HW / 9), 22, 8 * (map.HW / 9)); sun.target.position.set(0, 0, 0);
+    const sc = sun.shadow.camera; const SH = Math.max(13, map.HW * 1.15); sc.left = -SH; sc.right = SH; sc.top = SH; sc.bottom = -SH; sc.near = 5; sc.far = 90;
     sun.shadow.normalBias = 0.03; sun.shadow.bias = -0.0005;
     scene.add(sun, sun.target);
     const stage = new T.Group(); scene.add(stage);      // toàn bộ sân + người chơi; xoay theo đội của mình
@@ -173,7 +173,9 @@
      * Đặt sau vạch cuối sân của mình, cao ~6 m, nhìn chếch xuống khoảng 22°, FOV 42/48/58 theo màn hình,
      * bám theo người chơi một phần (40% theo bề ngang). Công thức lấy từ updateCamera() của Pickle Ball,
      * nhân hệ số k vì sân dài 18 m (Pickle Ball: 13,4 m). Có thêm bước lùi/nâng camera để luôn thấy trọn sân. */
-    const K = map.HW / 6.7, camTest = new T.PerspectiveCamera(42, 1, 0.1, 300);
+    // KM: cỡ camera ở menu (nhìn cả sân lớn). KG: cỡ camera khi chơi giữ như sân cũ (18 m) và BÁM THEO người chơi,
+    // vì sân đã gấp đôi nên không còn nhìn trọn cả sân một lúc.
+    const KM = map.HW / 6.7, K = 9 / 6.7;
     const camPos = new T.Vector3(), camLook = new T.Vector3(), _t1 = new T.Vector3();
     let snap = true;
     world.setView = (w, h, myTeam) => {
@@ -194,31 +196,21 @@
       const aspect = camera.aspect, portrait = world.portrait, shortL = world.shortL;
       if (o.menu) {
         const a = -0.85 + o.t * 0.045;
-        _t1.set(Math.sin(a) * 13.5 * K, 7.4 * K, Math.cos(a) * 13.5 * K); camLook.set(0, 0.2, 0);
+        _t1.set(Math.sin(a) * 13.5 * KM, 7.4 * KM, Math.cos(a) * 13.5 * KM); camLook.set(0, 0.2, 0);
         camPos.copy(_t1);
       } else {
         // vị trí người mình trong hệ toạ độ camera (z dương = phía sau lưng mình)
         let px = 0, pz = map.HW;
         if (o.px != null) { _v.set(o.px, 0, o.pz); stage.localToWorld(_v); px = _v.x; pz = _v.z; }
         const n = (portrait ? 8.4 : shortL ? 7.6 : 6.2) * K, a = (portrait ? 12.6 : shortL ? 13.1 : 12.4) * K, sb = (portrait ? 8.6 : 5.9) * K;
-        const camZ = a + (Math.max(sb, pz + (portrait ? 2 : 0.9) * K) - sb);
+        // camera đi theo người mình cả chiều dọc lẫn ngang (giới hạn để không lòi ra ngoài sân quá xa)
+        const camZ = a + (pz + (portrait ? 2 : 0.9) * K - sb);
         const ang = Math.atan2(n, a - sb) - (camera.fov / 2) * Math.PI / 180;
         const lookZ = camZ - n / Math.tan(Math.max(0.2, ang));
-        const cx = px * (portrait ? 0.25 : 0.4), lx = 0.2 * px;
-        // lùi + nâng camera từng bước cho tới khi thấy trọn 4 góc sân
-        camTest.fov = camera.fov; camTest.aspect = aspect; camTest.updateProjectionMatrix();
-        let back = 0, lift = 0;
-        const corners = [];
-        for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, 0.9]) corners.push([sx * (map.HD + 0.4), y, sz * (map.HW + 0.2)]);
-        for (let i = 0; i < 16; i++) {
-          camTest.position.set(cx, n + lift, camZ + back); camTest.lookAt(lx, 0, lookZ); camTest.updateMatrixWorld();
-          let ok = true;
-          for (const c of corners) { _t1.set(c[0], c[1], c[2]).project(camTest); if (Math.abs(_t1.x) > 1.0 || _t1.y > 0.8 || _t1.y < -0.93 || _t1.z > 1) { ok = false; break; } }
-          if (ok) break;
-          back += 0.7 * K; lift += 0.35 * K;
-        }
-        _t1.set(cx, n + lift, camZ + back);
-        const k = snap ? 1 : 1 - Math.exp(-dt * (back > 0 ? 9 : 3.5));
+        const lim = map.HD + 2 * K;
+        const cx = Math.max(-lim, Math.min(lim, px * (portrait ? 0.7 : 0.85))), lx = Math.max(-lim, Math.min(lim, px * 0.85));
+        _t1.set(cx, n, camZ);
+        const k = snap ? 1 : 1 - Math.exp(-dt * 6);
         if (snap) { camPos.copy(_t1); camLook.set(lx, 0, lookZ); }
         else { camPos.lerp(_t1, k); camLook.lerp(_v.set(lx, 0, lookZ), k); }
       }

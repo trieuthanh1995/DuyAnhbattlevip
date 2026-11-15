@@ -21,8 +21,8 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
    - Súng nước: 1 viên / 0,5s, băng 5 viên rồi nạp 1,5s. 10 máu / viên. Không xuyên vật cản, đạn nảy tối đa 5 lần vào tường và chướng ngại vật.
    - Ná cao su: 1 phát / 1s, 50 máu, xuyên mọi vật thể và mọi kẻ địch trên đường bắn.
    - Cứ 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân (tối đa 8 cái, biến mất sau 16s):
-       ❤️ Hồi 10 máu   💪 +10 sát thương mỗi phát (cộng dồn, mất khi bị hạ)
-       🛡️ Khiên 2s (miễn sát thương)   ❄️ Đóng băng đối phương 2s (đứng im, không bắn được)
+       ❤️ Hồi 10 máu   💪 +10 sát thương mỗi phát trong 5s (nhặt thêm thì cộng dồn, tính lại 5s)
+       🛡️ Khiên 2s (miễn sát thương)   ❄️ Đóng băng đối phương 1s (không di chuyển được, vẫn ngắm và bắn được)
    - Đạn không gây sát thương cho đồng đội (và cho chính mình).
 
 4) ĐIỀU KHIỂN
@@ -31,7 +31,7 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
    Tay cầm  : cần trái đi, cần phải ngắm, RT/RB bắn.
 
 5) CAMERA
-   Giống Pickle Ball: đặt sau vạch cuối sân của đội mình, cao, nhìn chếch xuống, bám theo nhân vật;
+   (Sân giờ 36×22 m, camera bám theo nhân vật.) Giống Pickle Ball: đặt sau vạch cuối sân của đội mình, cao, nhìn chếch xuống, bám theo nhân vật;
    đội B (online) cũng nhìn từ phía của mình. Công thức nằm trong assets/arena.js (world.updateCamera).
 
 6) CHẾ ĐỘ

@@ -24,9 +24,10 @@
     // Ná cao su bắn tỉa: 1 viên / 1s, xuyên mọi vật thể
     SNIPER: { dmg: 50, delay: 1.0, range: 40, width: 0.16 },
     POWER_BONUS: 10,          // vật phẩm sức mạnh: +10 sát thương mỗi phát (cộng dồn)
-    HEAL: 10, SHIELD: 2, FREEZE: 2,
+    HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
+    POWER_TIME: 5,            // vật phẩm sức mạnh chỉ có tác dụng 5 giây (nhặt thêm thì cộng dồn + tính lại 5s)
     PICKUP_EVERY: 3, PICKUP_MAX: 8, PICKUP_LIFE: 16, PICKUP_R: 0.55,
-    HW: 9, HD: 5.5,           // nửa chiều dài / nửa chiều rộng sân (m)
+    HW: 18, HD: 11,           // nửa chiều dài / nửa chiều rộng sân (m) – sân 36×22, gấp đôi mỗi chiều so với bản cũ
     CHAR_SCALE: 1.3,          // hệ số phóng to nhân vật khi hiển thị
   };
   const PICKUP_TYPES = ['heal', 'power', 'shield', 'freeze'];
@@ -47,7 +48,7 @@
     }
     return out;
   }
-  const SPAWNS = { A: [[-7.3, -1.5], [-7.3, 1.5]], B: [[7.3, -1.5], [7.3, 1.5]] };
+  const SPAWNS = { A: [[-16.3, -2.5], [-16.3, 2.5]], B: [[16.3, -2.5], [16.3, 2.5]] };
   const MAPS = [
     { id: 'candy', name: 'Sân Kẹo Ngọt', desc: 'Hộp quà & kẹo tròn · nhiều chỗ nấp', sky: 0xffd6ea, court: 0xff9ec7,
       theme: { floor: 0xffc2dc, floor2: 0xffadd0, wall: 0xff7eb3, wallTop: 0xffe3f0, outer: 0xffe9a8, obst: 0x7bd3ff, obst2: 0xffe066, accent: 0xff4f93, circle: 'scoop', box: 'gift' },
@@ -68,12 +69,14 @@
       theme: { floor: 0x4a4bb8, floor2: 0x5b5cd0, wall: 0x2a2d6a, wallTop: 0x8f93ff, outer: 0x0f1236, obst: 0x9b8cff, obst2: 0x5ad1ff, accent: 0xffd23f, circle: 'pillar', box: 'block' },
       obstacles: mirror4([box(3.6, 0, 0.8, 3), box(0, 4.3, 4, 0.7), cir(7, 4, 0.9), cir(0, 0, 0.9)]) },
   ];
-  // bố cục vẽ cho sân 22×13: thu nhỏ vị trí ×0.82, kích thước ×0.9 cho vừa sân 18×11
+  // bố cục vẽ gốc cho sân 18×11 (thu ×0.82 vị trí, ×0.9 kích thước); sân mới gấp đôi mỗi chiều nên
+  // vị trí vật cản ×2 và kích thước phóng thêm ×1.3 để sân vẫn có chỗ nấp
+  const POS_K = 0.82 * (C.HW / 9), SIZE_K = 0.9 * 1.3;
   for (const m of MAPS) {
     m.HW = C.HW; m.HD = C.HD; m.spawns = SPAWNS;
     m.obstacles = m.obstacles.map((o) => o.t === 'box'
-      ? Object.assign({}, o, { x: +(o.x * 0.82).toFixed(2), z: +(o.z * 0.82).toFixed(2), w: +(o.w * 0.9).toFixed(2), d: +(o.d * 0.9).toFixed(2) })
-      : Object.assign({}, o, { x: +(o.x * 0.82).toFixed(2), z: +(o.z * 0.82).toFixed(2), r: +(o.r * 0.9).toFixed(2) }));
+      ? Object.assign({}, o, { x: +(o.x * POS_K).toFixed(2), z: +(o.z * POS_K).toFixed(2), w: +(o.w * SIZE_K).toFixed(2), d: +(o.d * SIZE_K).toFixed(2) })
+      : Object.assign({}, o, { x: +(o.x * POS_K).toFixed(2), z: +(o.z * POS_K).toFixed(2), r: +(o.r * SIZE_K).toFixed(2) }));
   }
   const VENUES = MAPS;   // ui.js dùng tên VENUES cho danh sách sân
 

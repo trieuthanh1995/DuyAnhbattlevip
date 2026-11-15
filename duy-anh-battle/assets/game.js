@@ -123,7 +123,7 @@
     world = Arena.build(renderer, mapId, quality());
     bullets = new Arena.Bullets(world); pickups = new Arena.Pickups(world); fx = new Arena.Fx(world);
     const dotGeo = new THREE.CircleGeometry(0.07, 8), dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
-    for (let i = 0; i < 46; i++) { const m = new THREE.Mesh(dotGeo, dotMat.clone()); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.visible = false; world.stage.add(m); aimDots.push(m); }
+    for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(dotGeo, dotMat.clone()); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.visible = false; world.stage.add(m); aimDots.push(m); }
     for (const p of list) {
       const def = CHAR(p.char), look = p.look || {};
       const ch = PP.Character.build(def, { team: 'B', look });     // 'B' = hướng +z, xoay bằng holder
@@ -132,7 +132,7 @@
       const weapon = p.weapon === 'sniper' ? 'sniper' : 'rifle';
       const gun = PP.Guns.attach(ch, weapon, PP.Guns.colorFrom(def, look));     // cầm súng, không cầm vợt
             const shield = Arena.makeShield(), ice = Arena.makeIce(); shield.visible = ice.visible = false; holder.add(shield, ice);
-      const obj = Object.assign({ x: 0, z: 0, vx: 0, vz: 0, aim: p.team === 'A' ? Math.PI / 2 : -Math.PI / 2, yaw: 0, hp: C.HP, alive: true, am: C.RIFLE.mag, rl: 0, sn: 0, sh: 0, fr: 0, pw: 0, rs: 0,
+      const obj = Object.assign({ x: 0, z: 0, vx: 0, vz: 0, aim: p.team === 'A' ? Math.PI / 2 : -Math.PI / 2, yaw: 0, hp: C.HP, alive: true, am: C.RIFLE.mag, rl: 0, sn: 0, sh: 0, fr: 0, pw: 0, pwt: 0, rs: 0,
         buf: [], tag: null, deadT: 0, kick: 0, celebrate: false }, p, { w: weapon, ch, holder, gun, shield, ice });
       obj.yaw = obj.aim;
       if (tags) {
@@ -231,7 +231,7 @@
       case 'dead': {
         const q = players.get(e.id); if (!q) break;
         V.lives = e.lives;
-        q.alive = false; q.hp = 0; q.deadT = 0.0001; q.pw = 0; q.fr = 0; q.sh = 0;
+        q.alive = false; q.hp = 0; q.deadT = 0.0001; q.pw = 0; q.pwt = 0; q.fr = 0; q.sh = 0;
         fx.burst(q.x, q.z, 0xffffff, 22, 4, 0.7, 0.13); fx.ring(q.x, q.z, 0xff6b8a, 2.8);
         floater(q.x, q.z, '-1 ♥', 'dmg', 2.2);
         if (q.tag) q.tag.classList.add('dead');
@@ -242,7 +242,7 @@
       }
       case 'respawn': {
         const q = players.get(e.id); if (!q) break;
-        Object.assign(q, { alive: true, hp: C.HP, x: e.x, z: e.z, aim: e.aim, yaw: e.aim, vx: 0, vz: 0, sh: e.shield, fr: 0, pw: 0, am: C.RIFLE.mag, rl: 0, sn: 0, deadT: 0, rs: 0 });
+        Object.assign(q, { alive: true, hp: C.HP, x: e.x, z: e.z, aim: e.aim, yaw: e.aim, vx: 0, vz: 0, sh: e.shield, fr: 0, pw: 0, pwt: 0, am: C.RIFLE.mag, rl: 0, sn: 0, deadT: 0, rs: 0 });
         q.buf.length = 0; q.holder.visible = true;
         if (q.tag) q.tag.classList.remove('dead');
         fx.burst(e.x, e.z, 0x7fdcff, 16, 3.2, 0.8, 0.1); fx.ring(e.x, e.z, 0x6fdcff, 2.4);
@@ -257,6 +257,7 @@
         break;
       }
       case 'pickup_spawn': if (pickups) { pickups.add(e); A.spawnPing(); } break;
+      case 'power_end': { const q = players.get(e.id); if (q) { q.pw = 0; q.pwt = 0; if (q.isMe) updateHUD(); } break; }
       case 'pickup_expire': if (pickups) pickups.remove(e.id); break;
       case 'pickup_take': {
         if (pickups) pickups.remove(e.id);
@@ -264,7 +265,7 @@
         fx.burst(e.x, e.z, info.color, 14, 3.2, 0.8, 0.1); fx.ring(e.x, e.z, info.color, 2);
         if (p) {
           if (e.type === 'heal') { p.hp = e.hp; floater(p.x, p.z, '+' + C.HEAL, 'heal'); }
-          else if (e.type === 'power') { p.pw = e.power; floater(p.x, p.z, '💪 +' + C.POWER_BONUS + ' sát thương', 'heal'); }
+          else if (e.type === 'power') { p.pw = e.power; p.pwt = e.powerTime || C.POWER_TIME; floater(p.x, p.z, '💪 +' + C.POWER_BONUS + ' sát thương ' + C.POWER_TIME + 's', 'heal'); }
           else if (e.type === 'shield') { p.sh = C.SHIELD; floater(p.x, p.z, '🛡️ Khiên ' + C.SHIELD + 's', 'shield'); }
           else if (e.type === 'freeze') {
             for (const id of (e.frozen || [])) { const q = players.get(id); if (q) { q.fr = C.FREEZE; q.vx = q.vz = 0; floater(q.x, q.z, '❄️', 'shield'); } }
@@ -349,7 +350,7 @@
       this.flush();
       for (const sp of sim.players) {
         const v = players.get(sp.id); if (!v) continue;
-        v.hp = sp.hp; v.alive = sp.alive; v.am = sp.ammo; v.pw = sp.power;
+        v.hp = sp.hp; v.alive = sp.alive; v.am = sp.ammo; v.pw = sp.power; v.pwt = sp.power > 0 ? Math.max(0, sp.powerUntil - sim.t) : 0;
         v.rl = sp.reloadUntil ? Math.max(0, sp.reloadUntil - sim.t) : 0; v.sn = Math.max(0, sp.nextSnipe - sim.t);
         v.sh = Math.max(0, sp.shieldUntil - sim.t); v.fr = Math.max(0, sp.freezeUntil - sim.t);
         v.rs = sp.alive ? 0 : Math.max(0, sp.respawnAt - sim.t);
@@ -393,45 +394,34 @@
     const inp = PP.Input.poll();
     ctl.fire = false;
     if (!me) return;
-    const canAct = me.alive && V.phase === 'fight' && me.fr <= 0;
+    const canShoot = me.alive && V.phase === 'fight';          // bị đóng băng vẫn bắn được
+    const canMove = canShoot && me.fr <= 0;                    // …nhưng không di chuyển được
     // ngắm: cần/mũi tên > chuột (ngắm được cả lúc chọn súng và lúc bị đóng băng)
     if (me.alive) {
       if (inp.aimScreen) { const d = world.dirFromScreen(inp.aimScreen.x, inp.aimScreen.y); if (Math.hypot(d.x, d.z) > 0.01) me.aim = Math.atan2(d.x, d.z); }
       else if (inp.aimMouse) { const g = world.groundAt(inp.aimMouse.px, inp.aimMouse.py); if (g && Math.hypot(g.x - me.x, g.z - me.z) > 0.25) me.aim = Math.atan2(g.x - me.x, g.z - me.z); }
     }
-    if (canAct) {
+    if (canMove) {
       const d = world.dirFromScreen(inp.mx, inp.my);
       Shooter.stepMove(world.map, me, d.x, d.z, dt, 1);
     } else { me.vx = me.vz = 0; }
-    ctl.fire = !!(inp.fire && canAct);
+    ctl.fire = !!(inp.fire && canShoot);
     // tiếng "hết đạn"
-    if (inp.fire && canAct && me.w === 'rifle' && me.am === 0 && performance.now() - ctl.emptyT > 400) { ctl.emptyT = performance.now(); A.empty(); }
+    if (inp.fire && canShoot && me.w === 'rifle' && me.am === 0 && performance.now() - ctl.emptyT > 400) { ctl.emptyT = performance.now(); A.empty(); }
   }
 
-  /** Vạch ngắm: súng nước thấy cả quỹ đạo nảy, ná thấy tia thẳng */
+  /** Tâm ngắm ngắn: chỉ một vòng tròn nhỏ + vài chấm ngay trước mặt nhân vật (không vẽ quỹ đạo dài) */
+  const AIM_DIST = 2.6;
   function updateAimLine() {
     let n = 0;
     if (S().aimline && me && me.alive && V.phase === 'fight' && mode !== 'spectate') {
       const dx = Math.sin(me.aim), dz = Math.cos(me.aim);
-      if (me.w === 'rifle') {
-        const R = C.RIFLE, b = { x: me.x + dx * 0.6, z: me.z + dz * 0.6, vx: dx * R.speed, vz: dz * R.speed, r: R.r, bounces: 0, age: 0 };
-        let acc = 0;
-        for (let i = 0; i < 700 && n < aimDots.length; i++) {
-          const ox = b.x, oz = b.z;
-          const r = Shooter.stepBullet(world.map, b, 0.02);
-          acc += Math.hypot(b.x - ox, b.z - oz);
-          if (r === 'pop' || b.bounces >= 3) break;
-          if (acc >= 0.6) {
-            acc = 0; const m = aimDots[n++]; m.visible = true; m.position.x = b.x; m.position.z = b.z;
-            m.material.color.setHex(0x2b2d42); m.scale.setScalar(1 - n / 60); m.material.opacity = 0.5 - n * 0.008;
-          }
-        }
-      } else {
-        const len = Math.min(C.SNIPER.range, Shooter.rayToBounds(world.map, me.x, me.z, dx, dz));
-        for (let d = 0.8; d < len && n < aimDots.length; d += 0.75) {
-          const m = aimDots[n++]; m.visible = true; m.position.x = me.x + dx * d; m.position.z = me.z + dz * d;
-          m.material.color.setHex(0xff9f1c); m.scale.setScalar(0.9); m.material.opacity = 0.75;
-        }
+      const col = me.w === 'rifle' ? 0x2b2d42 : 0xff9f1c;
+      // 2 chấm dẫn đường + 1 chấm to làm tâm
+      for (const [d, sc, op] of [[1.2, 0.7, 0.55], [1.9, 0.9, 0.7], [AIM_DIST, 2.4, 0.9]]) {
+        if (n >= aimDots.length) break;
+        const m = aimDots[n++]; m.visible = true; m.position.x = me.x + dx * d; m.position.z = me.z + dz * d;
+        m.material.color.setHex(col); m.scale.setScalar(sc); m.material.opacity = op;
       }
     }
     for (let i = n; i < aimDots.length; i++) aimDots[i].visible = false;
@@ -568,12 +558,12 @@
     $('#w-rifle-cd').style.width = me.rl > 0 ? (100 * (1 - me.rl / C.RIFLE.reload)) + '%' : '0';
     $('#w-sniper-cd').style.width = me.sn > 0 ? (100 * (1 - me.sn / C.SNIPER.delay)) + '%' : '0';
     const fxs = [];
-    if (me.pw > 0) fxs.push('💪 +' + me.pw * C.POWER_BONUS + ' dmg');
+    if (me.pw > 0) fxs.push('💪 +' + me.pw * C.POWER_BONUS + ' dmg ' + (me.pwt || 0).toFixed(1) + 's');
     if (me.sh > 0) fxs.push('🛡️ ' + me.sh.toFixed(1) + 's');
     if (me.fr > 0) fxs.push('❄️ ' + me.fr.toFixed(1) + 's');
     const s = fxs.join('|');
     const bar = $('#fxbar');
-    if (bar.dataset.k !== s || me.sh > 0 || me.fr > 0) { bar.dataset.k = s; bar.textContent = ''; for (const f of fxs) { const sp = document.createElement('span'); sp.textContent = f; bar.append(sp); } }
+    if (bar.dataset.k !== s || me.sh > 0 || me.fr > 0 || me.pw > 0) { bar.dataset.k = s; bar.textContent = ''; for (const f of fxs) { const sp = document.createElement('span'); sp.textContent = f; bar.append(sp); } }
   }
   /** Bảng chọn vũ khí 5 giây đầu ván */
   function showPick(on, left) {
@@ -1184,7 +1174,7 @@
         if (m.lives) V.lives = m.lives;
         for (const s of m.players) {
           const p = players.get(s.id); if (!p) continue;
-          p.hp = s.hp; p.alive = s.al; p.am = s.am; p.rl = s.rl; p.sn = s.sn; p.sh = s.sh; p.fr = s.fr; p.pw = s.pw;
+          p.hp = s.hp; p.alive = s.al; p.am = s.am; p.rl = s.rl; p.sn = s.sn; p.sh = s.sh; p.fr = s.fr; p.pw = s.pw; p.pwt = s.pwt || 0;
           if (p.isMe) { if (Math.hypot(s.x - p.x, s.z - p.z) > 2.2) { p.x = s.x; p.z = s.z; } }   // server kéo lại khi lệch quá xa
           else { if (V.phase !== 'select') p.w = s.w; p.buf.push({ ts: m.ts, x: s.x, z: s.z, vx: s.vx, vz: s.vz, aim: s.aim }); if (p.buf.length > 24) p.buf.shift(); }
         }
@@ -1312,7 +1302,7 @@
     V.phase = s.phase; V.lives = s.lives; V.livesMax = s.livesMax || V.livesMax; V.selEnd = s.ts + (s.sel || 0);
     for (const st of s.players) {
       const p = players.get(st.id); if (!p) continue;
-      Object.assign(p, { x: st.x, z: st.z, vx: st.vx, vz: st.vz, aim: st.aim, yaw: st.aim, hp: st.hp, alive: st.al, am: st.am, rl: st.rl, sn: st.sn, sh: st.sh, fr: st.fr, pw: st.pw });
+      Object.assign(p, { x: st.x, z: st.z, vx: st.vx, vz: st.vz, aim: st.aim, yaw: st.aim, hp: st.hp, alive: st.al, am: st.am, rl: st.rl, sn: st.sn, sh: st.sh, fr: st.fr, pw: st.pw, pwt: st.pwt || 0 });
       if (p.isMe ? s.phase !== 'select' : s.phase !== 'select') p.w = st.w;
       p.buf.length = 0;
       if (!p.alive) { p.holder.visible = p.rs > 0; if (p.tag) p.tag.classList.add('dead'); p.holder.visible = false; }

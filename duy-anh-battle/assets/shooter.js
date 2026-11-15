@@ -134,7 +134,7 @@
       this.players = opts.players.map((p) => ({
         id: p.id, team: p.team, x: 0, z: 0, vx: 0, vz: 0, aim: 0, hp: C.HP, alive: true,
         weapon: p.weapon === 'sniper' ? 'sniper' : 'rifle', ammo: C.RIFLE.mag, reloadUntil: 0, nextRifle: 0, nextSnipe: 0,
-        shieldUntil: 0, freezeUntil: 0, power: 0, fire: false, lastSet: 0, respawnAt: 0, lockUntil: 0, deaths: 0, kills: 0,
+        shieldUntil: 0, freezeUntil: 0, power: 0, powerUntil: 0, fire: false, lastSet: 0, respawnAt: 0, lockUntil: 0, deaths: 0, kills: 0,
       }));
       this.phase = 'idle';
       this.t = 0; this.wall = 0; this.last = null; this.acc = 0;
@@ -234,7 +234,8 @@
           continue;
         }
         if (p.reloadUntil && t >= p.reloadUntil) { p.ammo = C.RIFLE.mag; p.reloadUntil = 0; }
-        if (!p.fire || p.freezeUntil > t) continue;
+        if (p.power > 0 && t >= p.powerUntil) { p.power = 0; p.powerUntil = 0; this.emit({ t: 'power_end', id: p.id }); }   // hết 5s: mất sức mạnh
+        if (!p.fire) continue;      // đang bị đóng băng vẫn bắn được (chỉ không di chuyển được)
         if (p.weapon === 'rifle') {
           if (p.ammo > 0 && !p.reloadUntil && t >= p.nextRifle) this.shootRifle(p);
         } else if (t >= p.nextSnipe) this.shootSnipe(p);
@@ -261,7 +262,7 @@
       p.x = pt.x; p.z = pt.z; p.vx = p.vz = 0; p.hp = C.HP; p.alive = true; p.respawnAt = 0;
       p.aim = Math.atan2(-pt.x, -pt.z);                      // quay về giữa sân
       p.ammo = C.RIFLE.mag; p.reloadUntil = 0; p.nextRifle = t + 0.3; p.nextSnipe = t + 0.3;
-      p.power = 0; p.freezeUntil = 0; p.fire = false;
+      p.power = 0; p.powerUntil = 0; p.freezeUntil = 0; p.fire = false;
       p.shieldUntil = t + C.SPAWN_SHIELD; p.lockUntil = t + 0.4;   // 0,4s bỏ qua vị trí cũ do máy khách gửi trễ
       this.emit({ t: 'respawn', id: p.id, x: p.x, z: p.z, aim: p.aim, shield: C.SPAWN_SHIELD });
     }
@@ -303,7 +304,7 @@
       q.alive = false; q.fire = false; q.deaths++; q.vx = q.vz = 0;
       if (by && by.team && by.team !== q.team) by.kills = (by.kills || 0) + 1;
       this.lives[q.team] = Math.max(0, this.lives[q.team] - 1);
-      q.power = 0; q.freezeUntil = 0;
+      q.power = 0; q.powerUntil = 0; q.freezeUntil = 0;
       q.respawnAt = this.t + C.RESPAWN_DELAY;
       this.emit({ t: 'dead', id: q.id, by: by.id, lives: Object.assign({}, this.lives), respawn: this.lives[q.team] > 0 });
       if (this.lives[q.team] <= 0) {
@@ -372,13 +373,13 @@
     applyPickup(p, pk) {
       const t = this.t, ev = { t: 'pickup_take', id: pk.id, by: p.id, type: pk.type, x: pk.x, z: pk.z };
       if (pk.type === 'heal') p.hp = Math.min(C.HP, p.hp + C.HEAL);
-      else if (pk.type === 'power') p.power++;
+      else if (pk.type === 'power') { p.power++; p.powerUntil = t + C.POWER_TIME; }
       else if (pk.type === 'shield') p.shieldUntil = Math.max(p.shieldUntil, t + C.SHIELD);
       else if (pk.type === 'freeze') {
         ev.frozen = [];
-        for (const q of this.players) if (q.alive && q.team !== p.team) { q.freezeUntil = t + C.FREEZE; q.vx = q.vz = 0; q.fire = false; ev.frozen.push(q.id); }
+        for (const q of this.players) if (q.alive && q.team !== p.team) { q.freezeUntil = t + C.FREEZE; q.vx = q.vz = 0; ev.frozen.push(q.id); }
       }
-      ev.hp = p.hp; ev.power = p.power;
+      ev.hp = p.hp; ev.power = p.power; ev.powerTime = C.POWER_TIME;
       this.emit(ev);
     }
 
@@ -410,7 +411,7 @@
       return { id: p.id, team: p.team, x: +p.x.toFixed(3), z: +p.z.toFixed(3), vx: +p.vx.toFixed(2), vz: +p.vz.toFixed(2), aim: +p.aim.toFixed(3),
         hp: p.hp, al: p.alive, w: p.weapon, am: p.ammo, rl: Math.max(0, +(p.reloadUntil - t).toFixed(2)),
         sn: Math.max(0, +(p.nextSnipe - t).toFixed(2)), sh: Math.max(0, +(p.shieldUntil - t).toFixed(2)),
-        fr: Math.max(0, +(p.freezeUntil - t).toFixed(2)), pw: p.power, rs: p.alive ? 0 : Math.max(0, +(p.respawnAt - t).toFixed(2)) };
+        fr: Math.max(0, +(p.freezeUntil - t).toFixed(2)), pw: p.power, pwt: p.power > 0 ? Math.max(0, +(p.powerUntil - t).toFixed(2)) : 0, rs: p.alive ? 0 : Math.max(0, +(p.respawnAt - t).toFixed(2)) };
     }
     /** Cập nhật định kỳ (≈20Hz) */
     state() { return { phase: this.phase, lives: Object.assign({}, this.lives), players: this.players.map((p) => this.pstate(p)) }; }
