@@ -1,4 +1,4 @@
-/* Bubble Blast – Bot AI (chạy offline trong trình duyệt và trên server online)
+/* Duy Anh Battle – Bot AI (chạy offline trong trình duyệt và trên server online)
  * Bot tự di chuyển bằng stepMove và điều khiển súng qua sim.setInput. */
 (function (root, factory) {
   const isNode = typeof module === 'object' && module.exports;
@@ -22,7 +22,7 @@
       this.rng = rng;
       this.aim = 0; this.errAng = 0; this.errT = 0;
       this.strafe = rng() < 0.5 ? 1 : -1; this.strafeT = 0;
-      this.seeT = 0; this.wpnT = 0; this.want = 'rifle';
+      this.seeT = 0;
       this.goal = null; this.goalT = 0;
       this.stuckT = 0; this.lastX = 0; this.lastZ = 0; this.unstick = 0; this.unstickDir = 1;
     }
@@ -83,7 +83,7 @@
     tick(dt, now) {
       const sim = this.sim, p = this.p, L = this.L;
       if (!p || !p.alive) return;
-      if (sim.phase !== 'fight' && sim.phase !== 'countdown') { p.vx = p.vz = 0; return; }
+      if (sim.phase !== 'fight') { p.vx = p.vz = 0; sim.setInput(this.id, { aim: p.aim, fire: false }); return; }
       const frozen = p.freezeUntil > sim.t;
       const en = this.nearestEnemy(p);
       // ---- ngắm & bắn
@@ -92,12 +92,6 @@
         const q = en.q, d = en.d;
         const los = segClear(sim.map, p.x, p.z, q.x, q.z, 0.12);
         this.seeT = los ? this.seeT + dt : 0;
-        this.wpnT -= dt;
-        if (this.wpnT <= 0) {
-          this.wpnT = this.rand(0.6, 1.2);
-          const wantSniper = (!los && d < 30 && this.rng() < L.sniper) || (los && d > 8 && this.rng() < L.sniper * 0.8) || (p.ammo === 0 && this.rng() < 0.7);
-          this.want = wantSniper ? 'sniper' : 'rifle';
-        }
         const sniper = p.weapon === 'sniper';
         // dự đoán vị trí (đạn trường bay tốc độ hữu hạn)
         const tf = sniper ? 0 : d / C.RIFLE.speed;
@@ -114,7 +108,7 @@
           else fire = los && ready && p.ammo > 0 && d < 16;
         }
       } else this.errT = 0;
-      sim.setInput(this.id, { aim: this.aim, fire, w: this.want });
+      sim.setInput(this.id, { aim: this.aim, fire });
 
       // ---- di chuyển
       if (frozen || sim.phase !== 'fight') { p.vx = p.vz = 0; return; }
@@ -157,5 +151,11 @@
     }
   }
 
-  return { BotBrain };
+  /** Bot chọn súng trong 5 giây đầu ván: cấp càng cao càng hay chọn ná */
+  function chooseWeapon(levelId, rng) {
+    const L = LEVELS[levelId] || LEVELS.pro;
+    return rng() < L.pickSniper ? 'sniper' : 'rifle';
+  }
+
+  return { BotBrain, chooseWeapon };
 });

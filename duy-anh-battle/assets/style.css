@@ -500,3 +500,28 @@ body.touch #fxbar { bottom: auto; top: 118px; }
   .scoreboard .sc { min-width: 22px; }
   .scoreboard .mid { padding: 4px 4px; }
 }
+
+/* ---------- Duy Anh Battle: chọn vũ khí 5 giây, bảng súng khóa ---------- */
+#wpn .w { pointer-events: none; }
+#pick { position: fixed; inset: 0; z-index: 14; display: flex; align-items: flex-end; justify-content: center; padding-bottom: max(70px, 14vh); pointer-events: none; }
+#pick .pick-card { pointer-events: auto; background: rgba(255, 255, 255, 0.95); border-radius: 24px; padding: 14px 18px 18px; box-shadow: 0 12px 40px rgba(20, 30, 60, 0.32); text-align: center; max-width: min(560px, 94vw); }
+#pick h3 { margin: 0 0 2px; font-size: 22px; }
+#pick p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+#pick p b { display: inline-block; min-width: 1ch; font-size: 22px; color: var(--primary); }
+#pick .pick-row { display: flex; gap: 12px; justify-content: center; }
+#pick button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 10px; border: 0; border-radius: 18px; background: #f2f4fb; font: inherit; color: var(--ink); cursor: pointer; box-shadow: 0 5px 0 rgba(0, 0, 0, 0.12); min-width: 150px; }
+#pick button .pi { font-size: 40px; line-height: 1.1; }
+#pick button small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+#pick button.sel { background: #fff0f5; box-shadow: 0 0 0 4px var(--primary), 0 5px 0 rgba(0, 0, 0, 0.12); transform: translateY(-3px); }
+body.touch #pick { align-items: center; padding-bottom: 0; }
+body.touch #pick button { min-width: 120px; padding: 8px 6px; }
+body.touch #pick button small { display: none; }
+@media (max-width: 520px) {
+  .scoreboard { max-width: calc(100vw - 78px); }
+  .scoreboard .hpcol .nm { display: none; }
+  .scoreboard .hpcol, .hpbar { min-width: 40px; }
+  .scoreboard .ava { font-size: 18px; }
+  .scoreboard .sc { font-size: 19px; min-width: 0; }
+  .hpbar b { font-size: 10px; }
+}
+body.touch #btn-pause { top: 64px; }

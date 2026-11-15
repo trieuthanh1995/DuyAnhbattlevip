@@ -8,7 +8,7 @@ const path = require('path');
 const { accept } = require('./ws-lite');
 const cfg = require('./assets/config.js');
 const { Sim, Shooter } = require('./assets/shooter.js');
-const { BotBrain } = require('./assets/ai.js');
+const { BotBrain, chooseWeapon } = require('./assets/ai.js');
 const { Protocol } = require('./assets/protocol.js');
 
 const { C, CHARACTERS } = cfg;
@@ -83,6 +83,13 @@ function pickTeam(room) {
   if (b >= size) return 'A';
   return a <= b ? 'A' : 'B';
 }
+/** 22 mạng chỉ dành cho đấu đôi; đấu đơn tối đa 11 */
+function fixSettings(mode, s) {
+  let lives = s.lives;
+  if (mode !== '2v2' && lives === 22) lives = 11;
+  return { venue: s.venue, lives };
+}
+
 function createRoom(host, mode, settings, quick) {
   leaveRoom(host);
   const room = {
@@ -137,7 +144,7 @@ function matchStartMsg(room, forPid) {
   const mem = member(room, forPid);
   const msg = {
     t: 'match_start', matchId: M.id,
-    settings: { teamSize: sizeOf(room), bo: room.settings.bo, venue: room.settings.venue },
+    settings: { teamSize: sizeOf(room), lives: M.m.livesMax, venue: room.settings.venue },
     players: M.roster,
   };
   if (mem) msg.yourTeam = mem.team;
@@ -153,7 +160,7 @@ function startMatch(room) {
     for (const h of hs) {
       const p = players.get(h.pid); used.add(p.char);
       roster.push({ id: p.pid, team, char: p.char, name: p.name, isBot: false, look: p.look });
-      plist.push({ id: p.pid, team });
+      plist.push({ id: p.pid, team, weapon: p.weapon === 'sniper' ? 'sniper' : 'rifle' });
     }
     for (let i = hs.length; i < size; i++) {
       const pool = CHARACTERS.filter((c) => !used.has(c.id));
@@ -161,11 +168,11 @@ function startMatch(room) {
       used.add(ch.id);
       const id = 'bot' + (++botSeq);
       roster.push({ id, team, char: ch.id, name: ch.name, isBot: true, look: {} });
-      plist.push({ id, team });
+      plist.push({ id, team, weapon: chooseWeapon(room.botLevel, Math.random) });
     }
   }
   const seed = (Math.random() * 1e9) | 0;
-  const m = new Sim({ map: room.settings.venue, teamSize: size, bo: room.settings.bo, seed, players: plist });
+  const m = new Sim({ map: room.settings.venue, teamSize: size, lives: room.settings.lives, seed, players: plist });
   const M = { id: ++matchSeq, m, roster, bots: [], timers: new Map(), running: true, lastT: now(), lastState: 0, startTimer: null };
   roster.filter((r) => r.isBot).forEach((r, i) => {
     M.bots.push({ id: r.id, brain: new BotBrain(m, r.id, room.botLevel, Shooter.mulberry32(seed + i + 1)) });
@@ -270,7 +277,7 @@ function dequeue(p) {
 }
 function launchQuick(mode, list, fill) {
   const host = players.get(list[0].pid);
-  const room = createRoom(host, mode, { venue: cfg.MAPS[(Math.random() * cfg.MAPS.length) | 0].id, bo: 1 }, true);
+  const room = createRoom(host, mode, { venue: cfg.MAPS[(Math.random() * cfg.MAPS.length) | 0].id, lives: 5 }, true);
   room.fillBots = !!fill;
   for (let i = 1; i < list.length; i++) { const p = players.get(list[i].pid); if (p.room) leaveRoom(p, true); addMember(room, p); }
   for (const q of list) { const p = players.get(q.pid); sendP(p, { t: 'queue_status', waiting: false }); }
@@ -293,7 +300,7 @@ function handle(conn, m) {
   if (!p) return;
   switch (m.t) {
     case 'set_profile': {
-      p.name = Protocol.cleanName(m.name) || p.name; p.char = m.char; p.look = Protocol.cleanLook(m.look);
+      p.name = Protocol.cleanName(m.name) || p.name; p.char = m.char; p.look = Protocol.cleanLook(m.look); p.weapon = m.weapon === 'sniper' ? 'sniper' : 'rifle';
       if (p.room && !p.room.inMatch) pushRoomState(p.room);
       break;
     }
@@ -308,7 +315,7 @@ function handle(conn, m) {
     case 'queue_leave': if (dequeue(p)) sendP(p, { t: 'queue_status', waiting: false }); break;
     case 'room_create': {
       dequeue(p);
-      const room = createRoom(p, m.mode, { venue: m.settings.venue, bo: m.settings.bo }, false);
+      const room = createRoom(p, m.mode, fixSettings(m.mode, m.settings), false);
       pushRoomState(room);
       break;
     }
@@ -330,7 +337,7 @@ function handle(conn, m) {
     case 'room_update': {
       const room = p.room; if (!room || room.inMatch) return;
       const host = room.hostId === p.pid;
-      if (m.settings && host && !room.quick) room.settings = { venue: m.settings.venue, bo: m.settings.bo };
+      if (m.settings && host && !room.quick) room.settings = fixSettings(room.mode, m.settings);
       if (m.fillBots !== undefined && host && !room.quick) room.fillBots = m.fillBots;
       if (m.botLevel !== undefined && host && !room.quick) room.botLevel = m.botLevel;
       if (m.team && room.mode === '2v2' && !room.quick) {
@@ -360,6 +367,11 @@ function handle(conn, m) {
       const room = p.room || p.spec; if (!room) return;
       const text = Protocol.cleanChat(m.text); if (!text) return;
       broadcastRoom(room, { t: 'chat', name: p.name, text, sys: false });
+      break;
+    }
+    case 'pick': {
+      const room = p.room, M = room && room.match; if (!M || !M.running) return;
+      M.m.pick(p.pid, m.w);        // chỉ nhận trong 5 giây đầu ván
       break;
     }
     case 'input': {
@@ -402,7 +414,7 @@ function hello(conn, m) {
   if (p.conn && p.conn !== conn) { p.conn.player = null; p.conn.terminate(); }
   p.conn = conn; conn.player = p;
   p.name = Protocol.cleanName(m.name) || p.name || 'Người chơi';
-  p.char = m.char; p.look = Protocol.cleanLook(m.look);
+  p.char = m.char; p.look = Protocol.cleanLook(m.look); p.weapon = m.weapon === 'sniper' ? 'sniper' : 'rifle';
   send(conn, { t: 'welcome', playerId: pid, serverTime: now() });
   const room = p.room;
   if (room) {

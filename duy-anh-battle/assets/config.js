@@ -1,4 +1,4 @@
-/* Bubble Blast – hằng số & dữ liệu dùng chung (trình duyệt + Node) */
+/* Duy Anh Battle – hằng số & dữ liệu dùng chung (trình duyệt + Node) */
 (function (root, factory) {
   const mod = factory();
   if (typeof module === 'object' && module.exports) module.exports = mod;
@@ -14,9 +14,11 @@
     PLAYER_R: 0.42,           // bán kính va chạm của nhân vật
     SPEED: 4.6,               // m/s
     STEP: 1 / 60,             // bước mô phỏng cố định
-    COUNTDOWN: 3,             // giây đếm ngược đầu mỗi hiệp
-    ROUND_END_DELAY: 2.6,
-    SWITCH_DELAY: 0.3,        // đổi súng mất 0,3s
+    SELECT_TIME: 5,           // đầu ván: 5 giây chọn 1 loại vũ khí, chọn xong không đổi được
+    SPAWN_SHIELD: 2,          // mỗi lần xuất hiện (đầu ván và mỗi lần hồi sinh): bất tử 2 giây
+    RESPAWN_DELAY: 1.5,       // chờ trước khi hồi sinh ở vị trí ngẫu nhiên
+    END_DELAY: 1.6,           // dừng một nhịp trước khi hiện bảng kết quả
+    LIVES: [5, 7, 11, 22],    // số mạng mỗi bên (22 chỉ dành cho đấu đôi 2v2)
     // Súng trường bong bóng: 1 viên / 0,5s, băng 5 viên, đạn nảy tối đa 5 lần, không xuyên vật cản
     RIFLE: { dmg: 10, delay: 0.5, mag: 5, reload: 1.5, speed: 11, r: 0.17, bounces: 5, life: 10 },
     // Ná cao su bắn tỉa: 1 viên / 1s, xuyên mọi vật thể
@@ -100,9 +102,9 @@
 
   // bot: speed × tốc độ nhân vật, err = sai số ngắm (rad), turn = tốc độ xoay nòng (rad/s), react = thời gian phản ứng (s)
   const LEVELS = {
-    rookie: { id: 'rookie', name: 'Tập sự',        speed: 0.62, err: 0.30, turn: 3.2,  react: 0.65, lead: 0.2, sniper: 0.10, dodge: 0.0, pickup: 0.35, range: 6.5 },
-    pro:    { id: 'pro',    name: 'Chuyên nghiệp', speed: 0.85, err: 0.12, turn: 6.0,  react: 0.30, lead: 0.8, sniper: 0.40, dodge: 0.5, pickup: 0.75, range: 5.5 },
-    ace:    { id: 'ace',    name: 'Cao thủ',       speed: 1.0,  err: 0.035, turn: 12.0, react: 0.10, lead: 1.0, sniper: 0.70, dodge: 0.9, pickup: 1.0,  range: 5.0 },
+    rookie: { id: 'rookie', name: 'Tập sự',        speed: 0.62, err: 0.30, turn: 3.2,  react: 0.65, lead: 0.2, pickSniper: 0.30, dodge: 0.0, pickup: 0.35, range: 6.5 },
+    pro:    { id: 'pro',    name: 'Chuyên nghiệp', speed: 0.85, err: 0.12, turn: 6.0,  react: 0.30, lead: 0.8, pickSniper: 0.50, dodge: 0.5, pickup: 0.75, range: 5.5 },
+    ace:    { id: 'ace',    name: 'Cao thủ',       speed: 1.0,  err: 0.035, turn: 12.0, react: 0.10, lead: 1.0, pickSniper: 0.60, dodge: 0.9, pickup: 1.0,  range: 5.0 },
   };
 
   const LOOK = {

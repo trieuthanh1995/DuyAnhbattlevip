@@ -1780,7 +1780,7 @@
     try {
       renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true });
     } catch (e) {
-      return { set() {}, setAnim() {}, resize() {}, dispose() {} };
+      return { set() {}, setAnim() {}, setWeapon() {}, resize() {}, dispose() {} };
     }
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.outputEncoding = T.sRGBEncoding;
@@ -1815,6 +1815,7 @@
     const turn = new T.Group(); scene.add(turn);
     const cam = new T.PerspectiveCamera(30, 1, 0.1, 30);
 
+    let gunCtl = null, weapon = 'rifle', gunColor = null;
     let ch = null, anim = 'idle', animT = 0, swingI = 0, angle = 0.35, vel = 0, drag = null, raf = 0, last = 0, dead = false;
     let cw = 0, chh = 0;
     const lookPt = new T.Vector3(0, 1.1, 3);
@@ -1839,14 +1840,18 @@
       renderer.setSize(w, h, false);
       frame();
     }
-    function set(def, look) {
+    function set(def, look, w) {
       if (dead) return;
-      if (ch) { ch.dispose(); ch = null; }
+      if (w) weapon = w;
+      if (ch) { ch.dispose(); ch = null; gunCtl = null; }
       ch = build(def, { team: 'B', look: look || null });
       turn.add(ch.root);
+      // cầm súng (không cầm vợt)
+      if (PP.Guns) { gunColor = PP.Guns.colorFrom(def, look); gunCtl = PP.Guns.attach(ch, weapon, gunColor); }
       animT = 0;
-      for (let i = 0; i < 8; i++) ch.update(0.05, st);
+      for (let i = 0; i < 8; i++) { ch.update(0.05, st); if (gunCtl) gunCtl.sync(0); }
     }
+    function setWeapon(w) { weapon = w; if (gunCtl) gunCtl.setKind(w, gunColor); }
     function setAnim(a) {
       anim = (a === 'ready' || a === 'swing' || a === 'celebrate') ? a : 'idle';
       animT = 0; swingI = 0;
@@ -1866,6 +1871,7 @@
         if (anim === 'swing' && animT > 1.25) { animT = 0; ch.swing({ zone: SW[swingI++ % SW.length], contact: null, timeToContact: 0.32 }); }
         if (anim === 'celebrate' && animT > 2.3) { animT = 0; ch.react('celebrate'); }
         ch.update(dt, st);
+        if (gunCtl) gunCtl.sync(0);
       }
       renderer.render(scene, cam);
     }
@@ -1903,7 +1909,7 @@
       renderer.renderLists.dispose();
       renderer.dispose();
     }
-    return { set, setAnim, resize() { cw = 0; resize(); }, dispose, get character() { return ch; } };
+    return { set, setAnim, setWeapon, resize() { cw = 0; resize(); }, dispose, get character() { return ch; } };
   }
 
   const OPTIONS = { palette: PALETTE.slice(), patterns: PATTERNS.map((p) => Object.assign({}, p)), accessories: ACCESSORIES.map((a) => Object.assign({}, a)), shirtStyles: SHIRT_STYLES.map((x) => Object.assign({}, x)) };

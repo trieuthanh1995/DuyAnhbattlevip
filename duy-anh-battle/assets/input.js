@@ -1,8 +1,8 @@
-/* Bubble Blast – điều khiển
- * Máy tính: WASD đi · chuột ngắm · bấm chuột/Space bắn · Q hoặc chuột phải đổi súng (1 = súng bong bóng, 2 = ná)
- *           mũi tên = ngắm + bắn kiểu 2 cần (không cần chuột)
- * Cảm ứng : cần trái = đi, cần phải = ngắm (giữ cần là bắn), nút 🔁 đổi súng
- * Tay cầm : cần trái đi, cần phải ngắm, RT/RB bắn, Y/LB đổi súng */
+/* Duy Anh Battle – điều khiển
+ * Máy tính: WASD đi · chuột ngắm · bấm chuột/Space bắn · mũi tên = ngắm + bắn kiểu 2 cần (không cần chuột)
+ * Cảm ứng : cần trái = đi, cần phải = ngắm (giữ cần là bắn)
+ * Tay cầm : cần trái đi, cần phải ngắm, RT/RB bắn
+ * (Vũ khí chọn trong 5 giây đầu ván rồi khóa nên không có phím đổi súng.) */
 (function (PP) {
   'use strict';
   const $ = (s) => document.querySelector(s);
@@ -10,7 +10,7 @@
   const S = {
     active: false, touch: false,
     mouse: { px: 0, py: 0, on: false, down: false },
-    move: { x: 0, y: 0 }, aimStick: null, fire: false, swap: 0, pick: null,
+    move: { x: 0, y: 0 }, aimStick: null, fire: false,
     stickL: null, stickR: null, pad: false,
   };
   const R = 62;   // bán kính cần ảo (px)
@@ -20,9 +20,6 @@
     if (!S.active || typing(e)) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (down) {
-      if (k === 'q' || k === 'Tab' || k === 'e') { if (!e.repeat) S.swap++; e.preventDefault(); return; }
-      if (k === '1') { S.pick = 'rifle'; return; }
-      if (k === '2') { S.pick = 'sniper'; return; }
       if (' ArrowUp ArrowDown ArrowLeft ArrowRight'.includes(k)) e.preventDefault();
       keys.add(k);
     } else keys.delete(k);
@@ -58,20 +55,16 @@
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'mouse' || !S.active) return;
       S.mouse.px = e.clientX; S.mouse.py = e.clientY; S.mouse.on = true;
-      if (e.button === 2) S.swap++; else S.mouse.down = true;
+      if (e.button !== 2) S.mouse.down = true;
     });
     window.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse' && e.button !== 2) S.mouse.down = false; });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     bindStick('#joy-zone', '#joy', '#joy-knob', 'stickL');
     bindStick('#aim-zone', '#aim', '#aim-knob', 'stickR');
-    const sw = $('#btn-swap');
-    if (sw) sw.addEventListener('pointerdown', (e) => { if (!S.active) return; S.swap++; S.touch = true; e.preventDefault(); });
   }
-  let padSwap = false;
   /** Gọi mỗi khung hình: trả về trạng thái điều khiển hiện tại */
   function poll() {
-    const o = { mx: 0, my: 0, aimScreen: null, aimMouse: null, fire: false, swap: S.swap, pick: S.pick, touch: S.touch };
-    S.swap = 0; S.pick = null;
+    const o = { mx: 0, my: 0, aimScreen: null, aimMouse: null, fire: false, touch: S.touch };
     // di chuyển
     let mx = 0, my = 0;
     if (keys.has('a')) mx -= 1; if (keys.has('d')) mx += 1;
@@ -86,9 +79,6 @@
       const ax = dz(gp.axes[2] || 0), ay = dz(gp.axes[3] || 0);
       if (ax || ay) { o.aimScreen = { x: ax, y: -ay }; o.fire = true; }
       if ((gp.buttons[7] && gp.buttons[7].pressed) || (gp.buttons[5] && gp.buttons[5].pressed)) o.fire = true;
-      const sw = (gp.buttons[3] && gp.buttons[3].pressed) || (gp.buttons[4] && gp.buttons[4].pressed);
-      if (sw && !padSwap) o.swap++;
-      padSwap = !!sw;
     }
     const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
     o.mx = mx; o.my = my;

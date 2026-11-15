@@ -1,4 +1,4 @@
-/* Bubble Blast – giao thức online (JSON qua WebSocket) + kiểm tra dữ liệu */
+/* Duy Anh Battle – giao thức online (JSON qua WebSocket) + kiểm tra dữ liệu */
 (function (root, factory) {
   const isNode = typeof module === 'object' && module.exports;
   const cfg = isNode ? require('./config.js') : root.PP;
@@ -7,10 +7,10 @@
   else { root.PP = root.PP || {}; Object.assign(root.PP, mod); }
 })(typeof self !== 'undefined' ? self : this, function (cfg) {
   'use strict';
-  const PROTOCOL_VERSION = 1;
+  const PROTOCOL_VERSION = 2;
   const ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const MODES = ['1v1', '2v2'];
-  const BOS = [1, 3];
+  const LIVES = cfg.C.LIVES;
   const WEAPONS = ['rifle', 'sniper'];
   const LEVEL_IDS = Object.keys(cfg.LEVELS);
   const VENUE_IDS = cfg.MAPS.map((v) => v.id);
@@ -34,10 +34,10 @@
     }
     return true;
   };
-  const settingsOk = (s) => isObj(s) && VENUE_IDS.includes(s.venue) && BOS.includes(s.bo);
+  const settingsOk = (s) => isObj(s) && VENUE_IDS.includes(s.venue) && LIVES.includes(s.lives);
 
   const V = {
-    hello: (m) => isStr(m.deviceId, 64, 8) && isStr(m.name, 40, 1) && CHAR_IDS.includes(m.char) && isInt(m.version, 0, 1e6) && lookOk(m.look),
+    hello: (m) => isStr(m.deviceId, 64, 8) && isStr(m.name, 40, 1) && CHAR_IDS.includes(m.char) && isInt(m.version, 0, 1e6) && lookOk(m.look) && (m.weapon === undefined || WEAPONS.includes(m.weapon)),
     ping: (m) => isNum(m.c, 0, 1e12),
     queue_join: (m) => MODES.includes(m.mode),
     queue_leave: () => true,
@@ -51,14 +51,15 @@
     room_ready: (m) => typeof m.ready === 'boolean',
     room_start: () => true,
     chat: (m) => isStr(m.text, 200, 1),
-    // trạng thái người chơi: vị trí, vận tốc, hướng ngắm, đang bóp cò, súng đang chọn
+    // trạng thái người chơi: vị trí, vận tốc, hướng ngắm, đang bóp cò (súng đã chốt từ đầu ván)
     input: (m) => isNum(m.x, -30, 30) && isNum(m.z, -30, 30) && isNum(m.vx, -20, 20) && isNum(m.vz, -20, 20) &&
-      isNum(m.aim, -10, 10) && typeof m.fire === 'boolean' && WEAPONS.includes(m.w),
+      isNum(m.aim, -10, 10) && typeof m.fire === 'boolean',
+    pick: (m) => WEAPONS.includes(m.w),
     rematch: () => true,
     spectate: (m) => isStr(m.code, 4, 4),
     spectate_leave: () => true,
     leaderboard: () => true,
-    set_profile: (m) => isStr(m.name, 40, 1) && CHAR_IDS.includes(m.char) && lookOk(m.look),
+    set_profile: (m) => isStr(m.name, 40, 1) && CHAR_IDS.includes(m.char) && lookOk(m.look) && (m.weapon === undefined || WEAPONS.includes(m.weapon)),
   };
   function validate(m) {
     if (!isObj(m) || typeof m.t !== 'string') return false;
@@ -84,5 +85,5 @@
     } catch (e) { return {}; }
     return out;
   }
-  return { Protocol: { PROTOCOL_VERSION, ROOM_ALPHABET, MODES, BOS, validate, cleanName, cleanChat, cleanLook, lookOk, settingsOk } };
+  return { Protocol: { PROTOCOL_VERSION, ROOM_ALPHABET, MODES, LIVES, validate, cleanName, cleanChat, cleanLook, lookOk, settingsOk } };
 });

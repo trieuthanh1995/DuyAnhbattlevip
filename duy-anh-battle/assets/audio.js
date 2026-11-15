@@ -1,4 +1,4 @@
-/* Bubble Blast v2 – âm thanh tổng hợp bằng WebAudio (không cần file âm thanh)
+/* Duy Anh Battle – âm thanh tổng hợp bằng WebAudio (không cần file âm thanh)
  * Tương thích ngược: hit(power), perfect(), bounce(), net(), whistle(), cheer(), click(), win(), lose(), unlock(), setMuted(), muted
  * Mới: hit(kind, quality, power), bounce(surface), cheer(level), ooh(), swoosh(), squeak(), ambience(on, venueId), setVolume(v)
  */
@@ -292,7 +292,7 @@
   }
 
 
-  /* ---------- Bubble Blast: tiếng súng, bong bóng, vật phẩm ---------- */
+  /* ---------- Duy Anh Battle: tiếng súng, bong bóng, vật phẩm ---------- */
   function gunShot(power) {          // "póp" bong bóng bay ra
     const p = 1 + (power || 0) * 0.06;
     tone(520 * p, 0.09, 'sine', 0.13, 1100 * p); tone(1300, 0.05, 'triangle', 0.05, 2100, 0.02);

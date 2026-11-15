@@ -1,4 +1,4 @@
-/* Bubble Blast – cảnh 3D nhìn từ trên xuống: sân, vật cản, súng, đạn bong bóng, vật phẩm, hiệu ứng */
+/* Duy Anh Battle – cảnh 3D nhìn từ trên xuống: sân, vật cản, súng, đạn nước, vật phẩm, hiệu ứng */
 (function (PP) {
   'use strict';
   const T = window.THREE;
@@ -122,18 +122,18 @@
   function build(renderer, mapId, quality) {
     const map = Shooter.mapOf(mapId), th = map.theme;
     const scene = new T.Scene();
-    scene.background = lin(deep(th.outer, 0.8));
+    scene.background = lin(map.sky); scene.fog = new T.Fog(lin(map.sky), 70, 240);
     const env = envFor(renderer); if (env) { scene.environment = env; }
     const camera = new T.PerspectiveCamera(38, 1, 0.5, 300);
     const hemi = new T.HemisphereLight(lin(0xffffff), lin(th.floor2), 0.5); scene.add(hemi);
     const sun = new T.DirectionalLight(lin(0xfff3e0), 0.95);
     sun.position.set(-6, 22, 8); sun.target.position.set(0, 0, 0);
-    const sc = sun.shadow.camera; sc.left = -13; sc.right = 13; sc.top = 9; sc.bottom = -9; sc.near = 5; sc.far = 60;
+    const sc = sun.shadow.camera; sc.left = -13; sc.right = 13; sc.top = 13; sc.bottom = -13; sc.near = 5; sc.far = 60;
     sun.shadow.normalBias = 0.03; sun.shadow.bias = -0.0005;
     scene.add(sun, sun.target);
-
-    const g = new T.Group(); scene.add(g);
-    const outer = new T.Mesh(new T.PlaneGeometry(160, 160), mat(deep(th.outer, 0.8), { roughness: 0.95 }));
+    const stage = new T.Group(); scene.add(stage);      // toàn bộ sân + người chơi; xoay theo đội của mình
+    const g = new T.Group(); stage.add(g);
+    const outer = new T.Mesh(new T.PlaneGeometry(700, 700), mat(deep(th.outer, 0.8), { roughness: 0.95 }));
     outer.rotation.x = -Math.PI / 2; outer.position.y = -0.02; outer.receiveShadow = true; g.add(outer);
     const floor = new T.Mesh(new T.PlaneGeometry(map.HW * 2, map.HD * 2), new T.MeshStandardMaterial({ map: floorTexture(th, map), roughness: 0.7 }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; g.add(floor);
@@ -160,7 +160,7 @@
       m.castShadow = true; g.add(m); decor.push(m);
     }
 
-    const world = { renderer, scene, camera, map, sun, g, decor, portrait: false, upW: [0, -1], rightW: [1, 0], _t: 0 };
+    const world = { renderer, scene, stage, camera, map, sun, g, decor, portrait: false, _t: 0, myTeam: 'A' };
     const _v = new T.Vector3(), _ray = new T.Raycaster(), _pl = new T.Plane(new T.Vector3(0, 1, 0), -0.5);
     world.setQuality = (q) => {
       q = qOf(q); const s = QUALITY[q].shadow;
@@ -169,44 +169,91 @@
     };
     world.setQuality(quality);
 
-    /** Đặt góc nhìn theo kích thước màn hình: ngang → sân nằm ngang; dọc → xoay sân dọc (đội của mình ở dưới) */
+    /* ---------- Camera 3D y hệt game Pickle Ball ----------
+     * Đặt sau vạch cuối sân của mình, cao ~6 m, nhìn chếch xuống khoảng 22°, FOV 42/48/58 theo màn hình,
+     * bám theo người chơi một phần (40% theo bề ngang). Công thức lấy từ updateCamera() của Pickle Ball,
+     * nhân hệ số k vì sân dài 18 m (Pickle Ball: 13,4 m). Có thêm bước lùi/nâng camera để luôn thấy trọn sân. */
+    const K = map.HW / 6.7, camTest = new T.PerspectiveCamera(42, 1, 0.1, 300);
+    const camPos = new T.Vector3(), camLook = new T.Vector3(), _t1 = new T.Vector3();
+    let snap = true;
     world.setView = (w, h, myTeam) => {
       camera.aspect = w / h;
-      const portrait = h > w * 1.05;
-      world.portrait = portrait;
-      const up = portrait ? [myTeam === 'B' ? -1 : 1, 0] : [0, -1];   // hướng "lên màn hình" trên mặt sân
-      camera.up.set(up[0], 0, up[1]);
-      const tilt = 0.26, cx = 0, cz = 0;
-      const corners = [];
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, 1.0]) corners.push([sx * (map.HW + 0.7), y, sz * (map.HD + 0.7)]);
-      let lo = 6, hi = 90;
-      const fits = (H) => {
-        camera.position.set(cx - up[0] * H * tilt, H, cz - up[1] * H * tilt);
-        camera.lookAt(cx, 0, cz); camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
-        for (const c of corners) { _v.set(c[0], c[1], c[2]).project(camera); if (Math.abs(_v.x) > 0.97 || _v.y > 0.86 || _v.y < -0.8) return false; }
-        return true;
-      };
-      for (let i = 0; i < 22; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
-      fits(hi);
-      world.upW = up;
-      const e = camera.matrixWorld.elements;
-      const rl = Math.hypot(e[0], e[2]) || 1; world.rightW = [e[0] / rl, e[2] / rl];
+      camera.fov = w / h < 0.9 ? 58 : w / h < 1.3 ? 48 : 42;
+      camera.near = 0.3; camera.far = 300;
+      camera.updateProjectionMatrix();
+      world.portrait = w / h < 0.9;
+      world.shortL = w / h > 1 && h <= 500;
+      world.myTeam = myTeam === 'B' ? 'B' : 'A';
+      // Đội A xuất phát ở x<0 nhìn về +x; đội B ở x>0 nhìn về -x. Xoay stage để hướng "tiến lên" trùng -z của camera.
+      stage.rotation.y = world.myTeam === 'B' ? -Math.PI / 2 : Math.PI / 2;
+      stage.updateMatrixWorld(true);
+      snap = true;
+    };
+    /** o = { px, pz (toạ độ sim của người mình hoặc null), menu, t, shake } */
+    world.updateCamera = (dt, o) => {
+      const aspect = camera.aspect, portrait = world.portrait, shortL = world.shortL;
+      if (o.menu) {
+        const a = -0.85 + o.t * 0.045;
+        _t1.set(Math.sin(a) * 13.5 * K, 7.4 * K, Math.cos(a) * 13.5 * K); camLook.set(0, 0.2, 0);
+        camPos.copy(_t1);
+      } else {
+        // vị trí người mình trong hệ toạ độ camera (z dương = phía sau lưng mình)
+        let px = 0, pz = map.HW;
+        if (o.px != null) { _v.set(o.px, 0, o.pz); stage.localToWorld(_v); px = _v.x; pz = _v.z; }
+        const n = (portrait ? 8.4 : shortL ? 7.6 : 6.2) * K, a = (portrait ? 12.6 : shortL ? 13.1 : 12.4) * K, sb = (portrait ? 8.6 : 5.9) * K;
+        const camZ = a + (Math.max(sb, pz + (portrait ? 2 : 0.9) * K) - sb);
+        const ang = Math.atan2(n, a - sb) - (camera.fov / 2) * Math.PI / 180;
+        const lookZ = camZ - n / Math.tan(Math.max(0.2, ang));
+        const cx = px * (portrait ? 0.25 : 0.4), lx = 0.2 * px;
+        // lùi + nâng camera từng bước cho tới khi thấy trọn 4 góc sân
+        camTest.fov = camera.fov; camTest.aspect = aspect; camTest.updateProjectionMatrix();
+        let back = 0, lift = 0;
+        const corners = [];
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, 0.9]) corners.push([sx * (map.HD + 0.4), y, sz * (map.HW + 0.2)]);
+        for (let i = 0; i < 16; i++) {
+          camTest.position.set(cx, n + lift, camZ + back); camTest.lookAt(lx, 0, lookZ); camTest.updateMatrixWorld();
+          let ok = true;
+          for (const c of corners) { _t1.set(c[0], c[1], c[2]).project(camTest); if (Math.abs(_t1.x) > 1.0 || _t1.y > 0.8 || _t1.y < -0.93 || _t1.z > 1) { ok = false; break; } }
+          if (ok) break;
+          back += 0.7 * K; lift += 0.35 * K;
+        }
+        _t1.set(cx, n + lift, camZ + back);
+        const k = snap ? 1 : 1 - Math.exp(-dt * (back > 0 ? 9 : 3.5));
+        if (snap) { camPos.copy(_t1); camLook.set(lx, 0, lookZ); }
+        else { camPos.lerp(_t1, k); camLook.lerp(_v.set(lx, 0, lookZ), k); }
+      }
+      snap = false;
+      camera.position.copy(camPos);
+      const sh = o.shake || 0;
+      if (sh > 0.002) { camera.position.x += (Math.random() - 0.5) * sh; camera.position.y += (Math.random() - 0.5) * sh; }
+      camera.lookAt(camLook);
+      camera.updateMatrixWorld(true);
     };
     world.project = (x, y, z, out) => {
-      _v.set(x, y, z).project(camera);
+      _v.set(x, y, z); stage.localToWorld(_v); _v.project(camera);
       const r = renderer.domElement, W = r.clientWidth, H = r.clientHeight;
       out = out || {}; out.x = (_v.x * 0.5 + 0.5) * W; out.y = (-_v.y * 0.5 + 0.5) * H; out.vis = _v.z < 1;
       return out;
     };
-    /** Điểm trên mặt sân dưới con trỏ (px màn hình) */
+    /** Điểm trên mặt sân (toạ độ sim) dưới con trỏ (px màn hình) */
     world.groundAt = (px, py) => {
       const r = renderer.domElement;
       _ray.setFromCamera({ x: (px / r.clientWidth) * 2 - 1, y: -(py / r.clientHeight) * 2 + 1 }, camera);
       const hit = _ray.ray.intersectPlane(_pl, _v);
-      return hit ? { x: _v.x, z: _v.z } : null;
+      if (!hit) return null;
+      stage.worldToLocal(_v);
+      return { x: _v.x, z: _v.z };
     };
-    /** Vector màn hình (sx sang phải, sy lên) → hướng trên mặt sân */
-    world.dirFromScreen = (sx, sy) => ({ x: world.rightW[0] * sx + world.upW[0] * sy, z: world.rightW[1] * sx + world.upW[1] * sy });
+    /** Vector màn hình (sx sang phải, sy lên/tiến tới) → hướng trên mặt sân (toạ độ sim) */
+    world.dirFromScreen = (sx, sy) => {
+      camera.updateMatrixWorld();
+      const e = camera.matrixWorld.elements;
+      let rx = e[0], rz = e[2], fx = -e[8], fz = -e[10];
+      const rl = Math.hypot(rx, rz) || 1, fl = Math.hypot(fx, fz) || 1;
+      rx /= rl; rz /= rl; fx /= fl; fz /= fl;
+      const X = rx * sx + fx * sy, Z = rz * sx + fz * sy, phi = stage.rotation.y, c = Math.cos(phi), sn = Math.sin(phi);
+      return { x: X * c - Z * sn, z: X * sn + Z * c };
+    };
     world.update = (dt, t) => {
       world._t = t;
       for (let i = 0; i < decor.length; i++) decor[i].position.y += Math.sin(t * 1.5 + i) * 0.0015;
@@ -219,25 +266,6 @@
     return world;
   }
 
-  /* ---------- súng đồ chơi (hướng +z, gắn vào tay nhân vật) ---------- */
-  function makeGuns() {
-    const rifle = new T.Group();
-    const pink = mat(0xff6f91, { roughness: 0.35 }), white = mat(0xffffff, { roughness: 0.3 });
-    const body = new T.Mesh(new T.BoxGeometry(0.11, 0.11, 0.36), pink); body.position.set(0, 0, 0.06); rifle.add(body);
-    const barrel = new T.Mesh(new T.CylinderGeometry(0.035, 0.04, 0.24, 12), white); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.01, 0.3); rifle.add(barrel);
-    const wand = new T.Mesh(new T.TorusGeometry(0.075, 0.017, 8, 18), mat(0x6fe3ff, { emissive: lin(0x6fe3ff), emissiveIntensity: 0.4 })); wand.position.set(0, 0.01, 0.44); rifle.add(wand);
-    const tank = new T.Mesh(new T.SphereGeometry(0.085, 14, 10), new T.MeshStandardMaterial({ color: lin(0x9be7ff), transparent: true, opacity: 0.75, roughness: 0.1 })); tank.position.set(0, 0.11, 0.02); rifle.add(tank);
-    const grip = new T.Mesh(new T.BoxGeometry(0.06, 0.13, 0.07), white); grip.position.set(0, -0.11, -0.03); grip.rotation.x = 0.25; rifle.add(grip);
-    const sniper = new T.Group();
-    const wood = mat(0x9a6a3c, { roughness: 0.7 });
-    const stock = new T.Mesh(new T.BoxGeometry(0.07, 0.09, 0.5), wood); stock.position.set(0, 0, 0.12); sniper.add(stock);
-    for (const s of [-1, 1]) { const arm = new T.Mesh(new T.BoxGeometry(0.035, 0.2, 0.035), wood); arm.position.set(s * 0.08, 0.1, 0.4); arm.rotation.z = -s * 0.35; sniper.add(arm); }
-    const band = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.3, 6), mat(0xffd23f, { emissive: lin(0xffd23f), emissiveIntensity: 0.3 })); band.rotation.z = Math.PI / 2; band.position.set(0, 0.2, 0.3); sniper.add(band);
-    const scope = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 0.26, 12), mat(0x2b2d42, { roughness: 0.3 })); scope.rotation.x = Math.PI / 2; scope.position.set(0, 0.095, 0.14); sniper.add(scope);
-    const lens = new T.Mesh(new T.SphereGeometry(0.032, 10, 8), mat(0x6fe3ff, { emissive: lin(0x6fe3ff), emissiveIntensity: 0.7 })); lens.position.set(0, 0.095, 0.27); sniper.add(lens);
-    for (const o of [rifle, sniper]) o.traverse((m) => { if (m.isMesh) m.castShadow = true; });
-    return { rifle, sniper };
-  }
   function makeShield() {
     const m = new T.Mesh(new T.SphereGeometry(0.8, 20, 14), new T.MeshStandardMaterial({ color: lin(0x6fdcff), transparent: true, opacity: 0.28, roughness: 0.1, emissive: lin(0x3fb8ff), emissiveIntensity: 0.5, side: T.DoubleSide, depthWrite: false }));
     m.position.y = 0.5; return m;
@@ -260,11 +288,11 @@
     spawn(e, teamOf, catchUp) {
       const col = TEAM_COL[teamOf] || 0xffffff;
       const s = C.RIFLE.r * (1 + Math.min(2, (e.dmg - C.RIFLE.dmg) / 25));
-      const m = new T.Mesh(this.geo, new T.MeshStandardMaterial({ color: lin(0xcff4ff), transparent: true, opacity: 0.62, roughness: 0.05, metalness: 0.1, emissive: lin(col), emissiveIntensity: 0.55, depthWrite: false }));
+      const m = new T.Mesh(this.geo, new T.MeshStandardMaterial({ color: lin(0x6fd0ff), transparent: true, opacity: 0.8, roughness: 0.05, metalness: 0.1, emissive: lin(col), emissiveIntensity: 0.4, depthWrite: false }));
       m.scale.setScalar(s * 1.5);
       const h = new T.Mesh(this.hi, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })); h.position.set(-0.35, 0.4, -0.2); m.add(h);
       const b = { id: e.id, x: e.x, z: e.z, vx: e.vx, vz: e.vz, r: C.RIFLE.r, bounces: e.bounces || 0, age: 0, mesh: m, s, team: teamOf, seed: Math.random() * 6 };
-      this.world.scene.add(m);
+      this.world.stage.add(m);
       this.list.set(e.id, b);
       // bù độ trễ mạng: chạy tiếp từ lúc đạn được bắn
       if (catchUp > 0) { let left = Math.min(catchUp, 0.5); while (left > 0 && this.list.has(b.id)) { const d = Math.min(left, 1 / 120); left -= d; this.stepOne(b, d, null); } }
@@ -288,7 +316,7 @@
     }
     remove(id) {
       const b = this.list.get(id); if (!b) return null;
-      this.world.scene.remove(b.mesh); b.mesh.material.dispose(); b.mesh.children.forEach((c) => c.material.dispose());
+      this.world.stage.remove(b.mesh); b.mesh.material.dispose(); b.mesh.children.forEach((c) => c.material.dispose());
       this.list.delete(id); return b;
     }
     clear() { for (const id of Array.from(this.list.keys())) this.remove(id); }
@@ -311,10 +339,10 @@
       const ring = new T.Mesh(new T.RingGeometry(0.55, 0.72, 28), new T.MeshBasicMaterial({ color: lin(info.color), transparent: true, opacity: 0.7, side: T.DoubleSide, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; g.add(ring);
       const sp = new T.Sprite(new T.SpriteMaterial({ map: emojiTex(info.emoji), transparent: true, depthWrite: false })); sp.scale.setScalar(1.0); sp.position.y = 0.95; g.add(sp);
-      this.world.scene.add(g);
+      this.world.stage.add(g);
       this.list.set(e.id, { id: e.id, type: e.type, x: e.x, z: e.z, g, sp, ring, life: e.life || C.PICKUP_LIFE, age: 0, seed: Math.random() * 6 });
     }
-    remove(id) { const p = this.list.get(id); if (!p) return null; this.world.scene.remove(p.g); p.g.traverse((o) => { if (o.material) o.material.dispose(); if (o.geometry) o.geometry.dispose(); }); this.list.delete(id); return p; }
+    remove(id) { const p = this.list.get(id); if (!p) return null; this.world.stage.remove(p.g); p.g.traverse((o) => { if (o.material) o.material.dispose(); if (o.geometry) o.geometry.dispose(); }); this.list.delete(id); return p; }
     clear() { for (const id of Array.from(this.list.keys())) this.remove(id); }
     update(dt, t) {
       for (const p of this.list.values()) {
@@ -334,46 +362,46 @@
         const a = Math.random() * Math.PI * 2, sp = speed * (0.4 + Math.random() * 0.8);
         const m = new T.Mesh(this.geo, new T.MeshBasicMaterial({ color: lin(color), transparent: true, opacity: 0.9 }));
         const s = (size || 0.09) * (0.6 + Math.random() * 0.8); m.scale.setScalar(s);
-        m.position.set(x, y == null ? 0.55 : y, z); this.world.scene.add(m);
+        m.position.set(x, y == null ? 0.55 : y, z); this.world.stage.add(m);
         this.parts.push({ m, vx: Math.cos(a) * sp, vz: Math.sin(a) * sp, vy: 1.5 + Math.random() * 2, life: 0.45 + Math.random() * 0.3, age: 0, s });
       }
     }
     ring(x, z, color, size) {
       const m = new T.Mesh(new T.RingGeometry(0.8, 1, 28), new T.MeshBasicMaterial({ color: lin(color), transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false }));
-      m.rotation.x = -Math.PI / 2; m.position.set(x, 0.08, z); m.scale.setScalar(0.2); this.world.scene.add(m);
+      m.rotation.x = -Math.PI / 2; m.position.set(x, 0.08, z); m.scale.setScalar(0.2); this.world.stage.add(m);
       this.rings.push({ m, age: 0, life: 0.5, size: size || 1.6 });
     }
     beam(x1, z1, x2, z2, color) {
       const L = Math.hypot(x2 - x1, z2 - z1) || 0.01;
       const m = new T.Mesh(new T.BoxGeometry(0.14, 0.14, L), new T.MeshBasicMaterial({ color: lin(color || 0xffe27a), transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false }));
       m.position.set((x1 + x2) / 2, 0.6, (z1 + z2) / 2); m.rotation.y = Math.atan2(x2 - x1, z2 - z1);
-      this.world.scene.add(m); this.beams.push({ m, age: 0, life: 0.3 });
+      this.world.stage.add(m); this.beams.push({ m, age: 0, life: 0.3 });
     }
     update(dt) {
       for (let i = this.parts.length - 1; i >= 0; i--) {
         const p = this.parts[i]; p.age += dt;
-        if (p.age >= p.life) { this.world.scene.remove(p.m); p.m.material.dispose(); this.parts.splice(i, 1); continue; }
+        if (p.age >= p.life) { this.world.stage.remove(p.m); p.m.material.dispose(); this.parts.splice(i, 1); continue; }
         p.vy -= 9 * dt; p.m.position.x += p.vx * dt; p.m.position.z += p.vz * dt; p.m.position.y = Math.max(0.05, p.m.position.y + p.vy * dt);
         const k = 1 - p.age / p.life; p.m.material.opacity = 0.9 * k; p.m.scale.setScalar(p.s * (0.4 + k));
       }
       for (let i = this.rings.length - 1; i >= 0; i--) {
         const r = this.rings[i]; r.age += dt;
-        if (r.age >= r.life) { this.world.scene.remove(r.m); r.m.material.dispose(); this.rings.splice(i, 1); continue; }
+        if (r.age >= r.life) { this.world.stage.remove(r.m); r.m.material.dispose(); this.rings.splice(i, 1); continue; }
         const k = r.age / r.life; r.m.scale.setScalar(0.2 + r.size * k); r.m.material.opacity = 0.85 * (1 - k);
       }
       for (let i = this.beams.length - 1; i >= 0; i--) {
         const b = this.beams[i]; b.age += dt;
-        if (b.age >= b.life) { this.world.scene.remove(b.m); b.m.material.dispose(); b.m.geometry.dispose(); this.beams.splice(i, 1); continue; }
+        if (b.age >= b.life) { this.world.stage.remove(b.m); b.m.material.dispose(); b.m.geometry.dispose(); this.beams.splice(i, 1); continue; }
         const k = 1 - b.age / b.life; b.m.material.opacity = k; b.m.scale.set(k, k, 1);
       }
     }
     clear() {
-      for (const p of this.parts) { this.world.scene.remove(p.m); p.m.material.dispose(); }
-      for (const p of this.rings) { this.world.scene.remove(p.m); p.m.material.dispose(); }
-      for (const p of this.beams) { this.world.scene.remove(p.m); p.m.material.dispose(); }
+      for (const p of this.parts) { this.world.stage.remove(p.m); p.m.material.dispose(); }
+      for (const p of this.rings) { this.world.stage.remove(p.m); p.m.material.dispose(); }
+      for (const p of this.beams) { this.world.stage.remove(p.m); p.m.material.dispose(); }
       this.parts = []; this.rings = []; this.beams = [];
     }
   }
 
-  PP.Arena = { createRenderer, applyQuality, build, makeGuns, makeShield, makeIce, makeTeamRing, Bullets, Pickups, Fx, PK, TEAM_COL, qOf };
+  PP.Arena = { createRenderer, applyQuality, build, makeShield, makeIce, makeTeamRing, Bullets, Pickups, Fx, PK, TEAM_COL, qOf };
 })(window.PP);
