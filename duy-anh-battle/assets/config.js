@@ -25,7 +25,7 @@
     SNIPER: { dmg: 50, delay: 1.0, range: 40, width: 0.16 },
     POWER_BONUS: 10,          // vật phẩm sức mạnh: +10 sát thương mỗi phát (cộng dồn)
     HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
-    POWER_TIME: 5,            // vật phẩm sức mạnh chỉ có tác dụng 5 giây (nhặt thêm thì cộng dồn + tính lại 5s)
+    POWER_TIME: 2,            // vật phẩm sức mạnh: +10 sát thương trong 2 giây, KHÔNG cộng dồn (nhặt thêm chỉ làm mới lại 2s)
     PICKUP_EVERY: 3, PICKUP_MAX: 8, PICKUP_LIFE: 16, PICKUP_R: 0.55,
     HW: 18, HD: 11,           // nửa chiều dài / nửa chiều rộng sân (m) – sân 36×22, gấp đôi mỗi chiều so với bản cũ
     CHAR_SCALE: 1.3,          // hệ số phóng to nhân vật khi hiển thị
@@ -78,6 +78,17 @@
       ? Object.assign({}, o, { x: +(o.x * POS_K).toFixed(2), z: +(o.z * POS_K).toFixed(2), w: +(o.w * SIZE_K).toFixed(2), d: +(o.d * SIZE_K).toFixed(2) })
       : Object.assign({}, o, { x: +(o.x * POS_K).toFixed(2), z: +(o.z * POS_K).toFixed(2), r: +(o.r * SIZE_K).toFixed(2) }));
   }
+  // Vật cản BỔ SUNG cho sân lớn 36×22 (toạ độ cuối cùng, 1 góc phần tư rồi tự lấy đối xứng 4 góc).
+  // Giữ trống vùng quanh chỗ xuất phát (x ≈ ±16) để không bị kẹt khi vào trận.
+  const EXTRA = {
+    candy: [cir(8.5, 0, 1.0), box(7.6, 3.9, 1.4, 1.4), cir(13, 9, 1.0), box(0, 9.2, 1.3, 1.3), box(7.8, 8.8, 1.6, 1.6), cir(12.6, 2.2, 0.9), cir(3.0, 9.2, 0.8), box(15, 6.2, 1.3, 1.3)],
+    mushroom: [cir(8.6, 1.6, 0.9), cir(13.2, 9.0, 0.9), cir(3.4, 8.4, 0.8), cir(10.8, 0, 0.8), cir(6.6, 5.6, 0.7), cir(15.6, 7.4, 0.8), box(13.6, 2.4, 1.4, 0.6), cir(2.2, 4.9, 0.7)],
+    beach: [box(8.8, 6.8, 1.6, 1.1), cir(13.2, 2.3, 0.8), box(0, 9.2, 2.2, 1.0), cir(6.0, 0, 0.8), cir(3.4, 9.4, 0.8), box(11.8, 9.4, 1.8, 1.0), cir(15.2, 8.7, 0.8), box(15.6, 4.8, 1.0, 1.2)],
+    ice: [cir(6.2, 1.4, 0.7), cir(14.5, 9.2, 0.8), cir(5.8, 8.6, 0.7), cir(2.4, 9.3, 0.7), cir(13.8, 5.0, 0.7), cir(8.4, 0, 0.8), cir(0, 3.5, 0.7), cir(15.4, 6.6, 0.6)],
+    toy: [box(6.5, 0, 1.0, 2.4), box(13.6, 2.6, 0.8, 1.6), box(14.8, 9.0, 1.6, 1.0), box(4.5, 8.8, 1.6, 1.0), box(0, 9.3, 2.0, 0.8), box(10.5, 0, 2.0, 0.8), box(6.2, 6.5, 1.2, 1.2), box(15.2, 5.8, 0.9, 0.9)],
+    space: [box(9.5, 3.0, 0.8, 2.6), box(12.4, 0, 0.8, 3.0), cir(8.2, 5.9, 0.7), cir(15.2, 8.6, 0.8), box(3.0, 3.8, 2.0, 0.7), box(5.6, 9.0, 2.4, 0.7), cir(15.4, 5.2, 0.8), cir(0, 3.6, 0.6)],
+  };
+  for (const m of MAPS) m.obstacles = m.obstacles.concat(mirror4(EXTRA[m.id] || []));
   const VENUES = MAPS;   // ui.js dùng tên VENUES cho danh sách sân
 
   /* ---------- nhân vật (giữ nguyên) ---------- */

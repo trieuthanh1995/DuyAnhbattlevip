@@ -373,7 +373,7 @@
     applyPickup(p, pk) {
       const t = this.t, ev = { t: 'pickup_take', id: pk.id, by: p.id, type: pk.type, x: pk.x, z: pk.z };
       if (pk.type === 'heal') p.hp = Math.min(C.HP, p.hp + C.HEAL);
-      else if (pk.type === 'power') { p.power++; p.powerUntil = t + C.POWER_TIME; }
+      else if (pk.type === 'power') { p.power = 1; p.powerUntil = t + C.POWER_TIME; }   // không cộng dồn: nhặt thêm chỉ làm mới 2s
       else if (pk.type === 'shield') p.shieldUntil = Math.max(p.shieldUntil, t + C.SHIELD);
       else if (pk.type === 'freeze') {
         ev.frozen = [];
