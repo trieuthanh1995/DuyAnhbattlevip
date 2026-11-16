@@ -30,9 +30,17 @@
     // chip: chỉ lần NẢY thứ 2 vào vật cản làm sứt nửa nhát (lần va chạm 1 không gây hại), để súng nước phá nhanh hơn; lần thứ 3 vẫn tính trọn 1 nhát.
     BREAK: { hitsMin: 3, hitsMax: 5, minScale: 0.3, chip: 0.5 },
     // 💣 Bom ném: nhặt là tự ném BOMB.count quả vào chỗ gần địch, rơi sau tối đa BOMB.fall giây (địch chạy ra khỏi vùng nổ là né được)
-    BOMB: { count: 2, dmg: 20, fall: 1.0, stagger: 0.3, spread: 0.8, radius: 1.2 },
+    BOMB: { count: 2, pct: 0.2, fall: 1.0, stagger: 0.3, spread: 0.8, radius: 1.2 },
     // 👟 Giày: chạy nhanh BOOST_MUL lần trong BOOST_TIME giây
-    BOOST_MUL: 1.5, BOOST_TIME: 3,
+    BOOST_MUL: 2, BOOST_TIME: 3,   // đang chạy nhanh thì miễn nhiễm đóng băng (và được gỡ băng nếu đang bị)
+    // Vật phẩm co giãn theo máu gốc của trận (hpBase): hồi máu = HEAL_PCT × hpBase, mỗi quả bom = BOMB.pct × hpBase (100 máu → 10 và 20)
+    HEAL_PCT: 0.1,
+    // Máu tối đa cộng thêm nhờ hồi máu đầy bị chặn ở hpBase × (1 + HP_EXTRA)
+    HP_EXTRA: 0.5,
+    // Ná: người trúng thứ nhất 100% sát thương, người thứ hai (xuyên qua) chỉ còn PIERCE2
+    PIERCE2: 0.5,
+    // Đột tử: sau `after` giây giao tranh, máu tối đa của mọi người giảm dần `rate` × hpBase mỗi giây, xuống tới sàn floor × hpBase (tối thiểu 10)
+    SUDDEN: { after: 180, rate: 0.02, floor: 0.1 },
     POWER_BONUS: 10,          // vật phẩm sức mạnh: +10 sát thương mỗi phát (cộng dồn)
     HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
     POWER_TIME: 2,            // vật phẩm sức mạnh: +10 sát thương trong 2 giây, KHÔNG cộng dồn (nhặt thêm chỉ làm mới lại 2s)

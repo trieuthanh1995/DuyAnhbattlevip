@@ -183,6 +183,7 @@
       case 'select_start': {
         V.phase = 'select'; V.livesMax = e.lives; V.lives = { A: e.lives, B: e.lives };
         if (e.hp) V.hpBase = e.hp;
+        V.sudden = false;
         for (const q of players.values()) { q.hp = q.hpMax = V.hpBase; q.spd = 0; } V.selEnd = e.ts + e.select; ctl.selShown = -1; V.over = false;
         if (bullets) bullets.clear(); if (stones) stones.clear(); if (bombs) bombs.clear(); if (pickups) pickups.clear();
         for (const pos of e.positions) { const p = players.get(pos.id); if (p) { p.x = pos.x; p.z = pos.z; p.aim = pos.aim; p.yaw = pos.aim; } }
@@ -251,7 +252,7 @@
       }
       case 'respawn': {
         const q = players.get(e.id); if (!q) break;
-        Object.assign(q, { alive: true, hp: V.hpBase, hpMax: V.hpBase, spd: 0, x: e.x, z: e.z, aim: e.aim, yaw: e.aim, vx: 0, vz: 0, sh: e.shield, fr: 0, pw: 0, pwt: 0, am: C.RIFLE.mag, rl: 0, sn: 0, deadT: 0, rs: 0 });
+        Object.assign(q, { alive: true, hp: e.hp || V.hpBase, hpMax: e.hp || V.hpBase, spd: 0, x: e.x, z: e.z, aim: e.aim, yaw: e.aim, vx: 0, vz: 0, sh: e.shield, fr: 0, pw: 0, pwt: 0, am: C.RIFLE.mag, rl: 0, sn: 0, deadT: 0, rs: 0 });
         q.buf.length = 0; q.holder.visible = true;
         if (q.tag) q.tag.classList.remove('dead');
         fx.burst(e.x, e.z, 0x7fdcff, 16, 3.2, 0.8, 0.1); fx.ring(e.x, e.z, 0x6fdcff, 2.4);
@@ -278,6 +279,7 @@
         break;
       }
       case 'bomb_throw': if (bombs) bombs.add(e); break;
+      case 'sudden': V.sudden = true; UI.call('ĐỘT TỬ!', 'Máu tối đa giảm dần – kết thúc trận đi!', 'bad'); updateHUD(); break;
       case 'bomb_boom': {
         if (bombs) bombs.remove(e.id);
         if (fx) { fx.burst(e.x, e.z, 0xff9a3c, 22, 4.2, 0.6, 0.14); fx.burst(e.x, e.z, 0x444455, 10, 2.6, 0.5, 0.1); fx.ring(e.x, e.z, 0xff5a3c, e.r * 2.2); }
@@ -295,14 +297,15 @@
         if (p) {
           if (e.type === 'heal') {
             p.hp = e.hp; if (e.hpMax) p.hpMax = e.hpMax;
-            floater(p.x, p.z, e.bonus > 0 ? '❤️ +' + C.HEAL + ' · máu gốc +' + e.bonus : '+' + C.HEAL, 'heal');
+            floater(p.x, p.z, e.bonus > 0 ? '❤️ +' + e.heal + ' · máu gốc +' + e.bonus : '+' + (e.heal || ''), 'heal');
           }
           else if (e.type === 'bomb') floater(p.x, p.z, '💣 Ném ' + C.BOMB.count + ' bom!', 'heal');
-          else if (e.type === 'boots') { p.spd = e.speedTime || C.BOOST_TIME; floater(p.x, p.z, '👟 Chạy nhanh ×' + C.BOOST_MUL + ' ' + C.BOOST_TIME + 's', 'heal'); }
+          else if (e.type === 'boots') { p.spd = e.speedTime || C.BOOST_TIME; p.fr = 0; floater(p.x, p.z, '👟 Nhanh ×' + C.BOOST_MUL + ' · miễn đóng băng ' + C.BOOST_TIME + 's', 'heal'); }
           else if (e.type === 'power') { p.pw = e.power; p.pwt = e.powerTime || C.POWER_TIME; floater(p.x, p.z, '💪 +' + C.POWER_BONUS + ' sát thương ' + C.POWER_TIME + 's', 'heal'); }
           else if (e.type === 'shield') { p.sh = C.SHIELD; floater(p.x, p.z, '🛡️ Khiên ' + C.SHIELD + 's', 'shield'); }
           else if (e.type === 'freeze') {
             for (const id of (e.frozen || [])) { const q = players.get(id); if (q) { q.fr = C.FREEZE; q.vx = q.vz = 0; floater(q.x, q.z, '❄️', 'shield'); } }
+            for (const id of (e.immune || [])) { const q = players.get(id); if (q) floater(q.x, q.z, '👟 Miễn đóng băng', 'shield'); }
             floater(p.x, p.z, '❄️ Đóng băng!', 'shield');
           }
           A.pickup(e.type);
@@ -673,7 +676,7 @@
       setAva('#hud-l-ava', first(L)); setAva('#hud-r-ava', first(R));
     }
     $('#hud-target').textContent = V.livesMax + ' mạng · ' + V.hpBase + ' máu';
-    $('#hud-wind').textContent = V.teamSize === 2 ? 'Mạng chung của đội' : 'Hết mạng là thua';
+    $('#hud-wind').textContent = V.sudden ? '⚠️ ĐỘT TỬ: máu tối đa giảm dần' : V.teamSize === 2 ? 'Mạng chung của đội' : 'Hết mạng là thua';
   }
   function updateWeaponHud() {
     if (!me || V.phase === 'select') { $('#wpn').classList.add('hidden'); $('#fxbar').textContent = ''; return; }
@@ -1305,7 +1308,7 @@
       case 'match_start': startOnlineMatch(m); break;
       case 'sync': if (session) applySync(m.snapshot); break;
       case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'spop': case 'obs_break': case 'hit': case 'dead': case 'respawn': case 'bpop':
-      case 'bomb_throw': case 'bomb_boom': case 'power_end':
+      case 'bomb_throw': case 'bomb_boom': case 'sudden': case 'power_end':
       case 'pickup_spawn': case 'pickup_take': case 'pickup_expire': case 'match_end': case 'over': case 'paused': case 'resumed':
         if (session && session.matchId === m.matchId) applyEvent(m);
         break;
@@ -1553,7 +1556,7 @@
   }
 
   function applySync(s) {
-    V.phase = s.phase; V.lives = s.lives; V.livesMax = s.livesMax || V.livesMax; if (s.hpBase) V.hpBase = s.hpBase; V.selEnd = s.ts + (s.sel || 0);
+    V.phase = s.phase; V.lives = s.lives; V.livesMax = s.livesMax || V.livesMax; if (s.hpBase) V.hpBase = s.hpBase; V.sudden = !!s.sd; V.selEnd = s.ts + (s.sel || 0);
     for (const st of s.players) {
       const p = players.get(st.id); if (!p) continue;
       Object.assign(p, { x: st.x, z: st.z, vx: st.vx, vz: st.vz, aim: st.aim, yaw: st.aim, hp: st.hp, hpMax: st.hm || V.hpBase, spd: st.sp || 0, alive: st.al, am: st.am, rl: st.rl, sn: st.sn, sh: st.sh, fr: st.fr, pw: st.pw, pwt: st.pwt || 0 });

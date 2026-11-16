@@ -23,12 +23,13 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
      lần thứ 3 đạn vỡ; nếu lần đó đập vào vật cản thì tính 1 nhát phá. Lần va chạm thứ 1 vào vật cản KHÔNG gây hại; lần thứ 2 sứt nửa nhát (C.BREAK.chip); lần thứ 3 tính trọn 1 nhát. Vật cản bé cần 3 nhát, to cần 5 nhát (theo diện tích) mới
      biến mất, trước đó thu nhỏ dần. Tường bao không bị phá.
    - Ná cao su: 1 phát / 1,5s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 32 m/s (né được, cần ngắm đón đầu),
-     xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Tầm bay tối đa 40m.
+     xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Người trúng thứ nhất chịu 100% sát thương, người thứ hai chỉ 50%.
+   - ĐỘT TỬ: sau 3 phút giao tranh, máu tối đa của mọi người giảm dần mỗi giây (2% máu gốc/giây) xuống tối thiểu 10% máu gốc, kể cả khi hồi sinh. Chỉnh trong C.SUDDEN. Tầm bay tối đa 40m.
    - Cứ 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân (tối đa 8 cái, biến mất sau 16s):
-       ❤️ Hồi 10 máu (nếu máu đã đầy, phần dư được cộng vào máu gốc tối đa, giữ nguyên tới khi mất mạng)   💪 +10 sát thương mỗi phát trong 2s (không cộng dồn, nhặt thêm chỉ tính lại 2s)
+       ❤️ Hồi 10% máu gốc của trận (100 máu → 10). Nếu máu đã đầy, phần dư được cộng vào máu tối đa, giữ tới khi mất mạng, trần +50% máu gốc   💪 +10 sát thương mỗi phát trong 2s (không cộng dồn, nhặt thêm chỉ tính lại 2s)
        🛡️ Khiên 2s (miễn sát thương)   ❄️ Đóng băng đối phương 1s (không di chuyển được, vẫn ngắm và bắn được)
-       💣 Bom ném: nhặt là tự ném 2 quả xuống chỗ gần địch, mỗi quả 20 máu, rơi trong ≤1s (vùng nổ bán kính 1,2 m, chạy ra là né được)
-       👟 Giày: chạy nhanh gấp 1,5 lần trong 3 giây
+       💣 Bom ném: nhặt là tự ném 2 quả xuống chỗ gần địch, mỗi quả = 20% máu gốc của trận (100 máu → 20), rơi trong ≤1s (vùng nổ bán kính 1,2 m, chạy ra là né được)
+       👟 Giày: chạy nhanh gấp 2 lần trong 3 giây, miễn nhiễm đóng băng (đang bị băng thì được gỡ)
    - Đạn không gây sát thương cho đồng đội (và cho chính mình).
 
 4) ĐIỀU KHIỂN

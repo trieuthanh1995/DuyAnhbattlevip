@@ -153,6 +153,9 @@
       this.livesMax = (lv === 22 && this.teamSize === 1) ? 11 : lv;
       this.lives = { A: this.livesMax, B: this.livesMax };
       this.hpBase = normHp(opts.hp);                    // máu mỗi lần xuất hiện (100–1000)
+      this.healAmt = Math.max(1, Math.round(this.hpBase * C.HEAL_PCT));
+      this.bombDmg = Math.max(1, Math.round(this.hpBase * C.BOMB.pct));
+      this.fightStart = 0; this.sudden = false;
       this.rng = mulberry32((opts.seed >>> 0) || 1);
       this.players = opts.players.map((p) => ({
         id: p.id, team: p.team, x: 0, z: 0, vx: 0, vz: 0, aim: 0, hp: this.hpBase, hpMax: this.hpBase, alive: true,
@@ -241,10 +244,11 @@
       this.updateBullets(dt);
       this.updateStones(dt);
       this.updateBombs();
+      this.updateSudden();
       this.updatePickups();
     }
     beginFight() {
-      this.phase = 'fight';
+      this.phase = 'fight'; this.fightStart = this.t;
       this.nextPickup = this.t + C.PICKUP_EVERY;
       for (const p of this.players) { p.shieldUntil = this.t + C.SPAWN_SHIELD; p.lockUntil = 0; }
       const weapons = {}; for (const p of this.players) weapons[p.id] = p.weapon;
@@ -284,12 +288,12 @@
     }
     respawn(p) {
       const pt = this.spawnPoint(p), t = this.t;
-      p.x = pt.x; p.z = pt.z; p.vx = p.vz = 0; p.hp = p.hpMax = this.hpBase; p.alive = true; p.respawnAt = 0; p.speedUntil = 0;
+      p.x = pt.x; p.z = pt.z; p.vx = p.vz = 0; p.hp = p.hpMax = Math.min(this.hpBase, this.hpCap()); p.alive = true; p.respawnAt = 0; p.speedUntil = 0;
       p.aim = Math.atan2(-pt.x, -pt.z);                      // quay về giữa sân
       p.ammo = C.RIFLE.mag; p.reloadUntil = 0; p.nextRifle = t + 0.3; p.nextSnipe = t + 0.3;
       p.power = 0; p.powerUntil = 0; p.freezeUntil = 0; p.fire = false;
       p.shieldUntil = t + C.SPAWN_SHIELD; p.lockUntil = t + 0.4;   // 0,4s bỏ qua vị trí cũ do máy khách gửi trễ
-      this.emit({ t: 'respawn', id: p.id, x: p.x, z: p.z, aim: p.aim, shield: C.SPAWN_SHIELD });
+      this.emit({ t: 'respawn', id: p.id, x: p.x, z: p.z, aim: p.aim, shield: C.SPAWN_SHIELD, hp: p.hp });
     }
 
     shootRifle(p) {
@@ -328,8 +332,9 @@
           const s = Math.max(0, Math.min(step, rx * ux + rz * uz));
           const cx = rx - ux * s, cz = rz - uz * s;
           if (cx * cx + cz * cz <= rr * rr) {
+            const dmg = st.hit.length === 0 ? st.dmg : Math.round(st.dmg * C.PIERCE2);   // người thứ 2 trở đi: 50%
             st.hit.push(q.id);
-            this.damage(q, this.player(st.owner) || { id: st.owner }, st.dmg, 'snipe');
+            this.damage(q, this.player(st.owner) || { id: st.owner }, dmg, 'snipe');
             if (this.phase !== 'fight') return;
           }
         }
@@ -438,22 +443,45 @@
       const t = this.t, ev = { t: 'pickup_take', id: pk.id, by: p.id, type: pk.type, x: pk.x, z: pk.z };
       if (pk.type === 'heal') {
         // hồi máu; phần thừa khi đã đầy được cộng vào máu gốc (tối đa) của người chơi, giữ nguyên tới khi mất mạng
-        const room = p.hpMax - p.hp, bonus = Math.max(0, C.HEAL - room);
-        p.hpMax += bonus; p.hp = Math.min(p.hpMax, p.hp + C.HEAL);
-        ev.bonus = bonus;
+        const heal = this.healAmt, room = p.hpMax - p.hp, over = Math.max(0, heal - room);
+        const bonus = Math.max(0, Math.min(over, this.hpLimit() - p.hpMax));     // trần máu cộng thêm (+50% máu gốc, hoặc trần đột tử)
+        p.hpMax += bonus; p.hp = Math.min(p.hpMax, p.hp + heal);
+        ev.bonus = bonus; ev.heal = heal;
       }
       else if (pk.type === 'bomb') this.throwBombs(p);
-      else if (pk.type === 'boots') { p.speedUntil = t + C.BOOST_TIME; ev.speedTime = C.BOOST_TIME; }
+      else if (pk.type === 'boots') { p.speedUntil = t + C.BOOST_TIME; p.freezeUntil = 0; ev.speedTime = C.BOOST_TIME; }
       else if (pk.type === 'power') { p.power = 1; p.powerUntil = t + C.POWER_TIME; }   // không cộng dồn: nhặt thêm chỉ làm mới 2s
       else if (pk.type === 'shield') p.shieldUntil = Math.max(p.shieldUntil, t + C.SHIELD);
       else if (pk.type === 'freeze') {
         ev.frozen = [];
-        for (const q of this.players) if (q.alive && q.team !== p.team) { q.freezeUntil = t + C.FREEZE; q.vx = q.vz = 0; ev.frozen.push(q.id); }
+        ev.immune = [];
+        for (const q of this.players) if (q.alive && q.team !== p.team) {
+          if (q.speedUntil > t) { ev.immune.push(q.id); continue; }     // đang chạy nhanh bằng giày: miễn nhiễm đóng băng
+          q.freezeUntil = t + C.FREEZE; q.vx = q.vz = 0; ev.frozen.push(q.id);
+        }
       }
       ev.hp = p.hp; ev.hpMax = p.hpMax; ev.power = p.power; ev.powerTime = C.POWER_TIME;
       this.emit(ev);
     }
 
+    /** Trần máu tối đa hiện tại: máu gốc +50% (hồi máu đầy), và bị kéo xuống dần khi đột tử */
+    hpLimit() { return Math.min(Math.round(this.hpBase * (1 + C.HP_EXTRA)), this.hpCap(true)); }
+    /** Trần do đột tử (không đột tử thì bằng hpBase hoặc vô hạn nếu inf) */
+    hpCap(inf) {
+      const S = C.SUDDEN, el = this.t - this.fightStart;
+      if (this.phase === 'select' || !this.fightStart && this.phase !== 'fight' || el < S.after) return inf ? Infinity : this.hpBase;
+      const floor = Math.max(10, Math.round(this.hpBase * S.floor));
+      return Math.max(floor, Math.round(this.hpBase - this.hpBase * S.rate * (el - S.after)));
+    }
+    updateSudden() {
+      if (this.t - this.fightStart < C.SUDDEN.after) return;
+      if (!this.sudden) { this.sudden = true; this.emit({ t: 'sudden' }); }
+      const cap = this.hpCap(true);
+      for (const p of this.players) {
+        if (!p.alive || p.hpMax <= cap) continue;
+        p.hpMax = cap; if (p.hp > cap) p.hp = cap;
+      }
+    }
     /** Bom ném: tự ném BOMB.count quả vào vị trí gần địch (lệch ngẫu nhiên ≤ spread). Địch chạy khỏi vùng nổ trong lúc bom rơi là né được. */
     throwBombs(p) {
       const B = C.BOMB;
@@ -481,7 +509,7 @@
         for (const q of this.players) {
           if (!q.alive || q.team === b.team) continue;
           if (Math.hypot(q.x - b.x, q.z - b.z) <= B.radius) {
-            this.damage(q, owner, B.dmg, 'bomb');
+            this.damage(q, owner, this.bombDmg, 'bomb');
             if (this.phase !== 'fight') return;
           }
         }
@@ -523,6 +551,7 @@
     /** Ảnh chụp đầy đủ (cho người vào xem / kết nối lại) */
     snapshot() {
       return Object.assign(this.state(), {
+        sd: this.sudden,
         livesMax: this.livesMax, hpBase: this.hpBase, bombs: this.bombs.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, fall: b.fall, left: Math.max(0, +(b.land - this.t).toFixed(2)) })), sel: Math.max(0, +(this.selectEnd - this.t).toFixed(2)),
         pickups: this.pickups.map((q) => ({ id: q.id, type: q.type, x: q.x, z: q.z, life: Math.max(0, +(q.until - this.t).toFixed(1)) })),
         bullets: this.bullets.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, bounces: b.bounces })),
