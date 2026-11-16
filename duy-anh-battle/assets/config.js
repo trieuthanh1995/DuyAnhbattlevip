@@ -21,8 +21,8 @@
     LIVES: [5, 7, 11, 22],    // số mạng mỗi bên (22 chỉ dành cho đấu đôi 2v2)
     // Súng trường bong bóng: 1 viên / 0,5s, băng 5 viên, đạn nảy tối đa 5 lần, không xuyên vật cản
     RIFLE: { dmg: 10, delay: 0.5, mag: 5, reload: 1.5, speed: 11, r: 0.17, bounces: 5, life: 10 },
-    // Ná cao su bắn tỉa: 1 viên / 1s, xuyên mọi vật thể
-    SNIPER: { dmg: 50, delay: 1.0, range: 40, width: 0.16 },
+    // Ná cao su: 1 viên / 1,2s, 40 máu (3 phát hạ 1 người), đạn đá bay 32 m/s (né được), xuyên vật cản và mọi kẻ địch trên đường bay
+    SNIPER: { dmg: 40, delay: 1.2, speed: 32, range: 40, width: 0.16 },
     POWER_BONUS: 10,          // vật phẩm sức mạnh: +10 sát thương mỗi phát (cộng dồn)
     HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
     POWER_TIME: 2,            // vật phẩm sức mạnh: +10 sát thương trong 2 giây, KHÔNG cộng dồn (nhặt thêm chỉ làm mới lại 2s)

@@ -69,13 +69,14 @@
     }
     incomingBullet(p) {
       let worst = null, wt = 1.2;
-      for (const b of this.sim.bullets) {
+      // đạn súng nước + đá của ná (ná xuyên vật cản nên tường không che được, chỉ có né ngang)
+      for (const b of this.sim.bullets.concat(this.sim.stones || [])) {
         if (b.team === p.team) continue;
         const rx = p.x - b.x, rz = p.z - b.z, sp = Math.hypot(b.vx, b.vz);
         const t = (rx * b.vx + rz * b.vz) / (sp * sp);
         if (t < 0 || t > wt) continue;
         const cx = b.x + b.vx * t - p.x, cz = b.z + b.vz * t - p.z;
-        if (Math.hypot(cx, cz) < 0.9) { wt = t; worst = { b, cx, cz }; }
+        if (Math.hypot(cx, cz) < 0.9 && !(b.hit && b.hit.includes(p.id))) { wt = t; worst = { b, cx, cz }; }
       }
       return worst;
     }
@@ -93,8 +94,14 @@
         const los = segClear(sim.map, p.x, p.z, q.x, q.z, 0.12);
         this.seeT = los ? this.seeT + dt : 0;
         const sniper = p.weapon === 'sniper';
-        // dự đoán vị trí (đạn trường bay tốc độ hữu hạn)
-        const tf = sniper ? 0 : d / C.RIFLE.speed;
+        // đón đầu: cả súng nước (11 m/s) lẫn ná (32 m/s) đều bay với tốc độ hữu hạn.
+        // Giải gần đúng thời gian bay theo vị trí đối thủ ở thời điểm đạn tới (lặp 3 lần), nhân hệ số lead của cấp bot.
+        const spd = sniper ? C.SNIPER.speed : C.RIFLE.speed;
+        let tf = d / spd;
+        for (let k = 0; k < 3; k++) {
+          const px = q.x + q.vx * tf * L.lead, pz = q.z + q.vz * tf * L.lead;
+          tf = Math.hypot(px - p.x, pz - p.z) / spd;
+        }
         const tx = q.x + q.vx * tf * L.lead, tz = q.z + q.vz * tf * L.lead;
         this.errT -= dt;
         if (this.errT <= 0) { this.errT = this.rand(0.35, 0.8); this.errAng = (this.rng() + this.rng() + this.rng() - 1.5) * 2 * L.err; }

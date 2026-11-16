@@ -328,6 +328,46 @@
     clear() { for (const id of Array.from(this.list.keys())) this.remove(id); }
   }
 
+  /* ---------- đạn ná cao su: viên đá bay thẳng, xuyên vật cản, có vệt sáng ---------- */
+  class Stones {
+    constructor(world) {
+      this.world = world; this.list = new Map();
+      this.geo = new T.SphereGeometry(1, 12, 8);
+      this.trailGeo = new T.BoxGeometry(1, 1, 1);
+    }
+    spawn(e, teamOf, catchUp) {
+      const col = TEAM_COL[teamOf] || 0xffe27a;
+      const sp = Math.hypot(e.vx, e.vz) || 1, ux = e.vx / sp, uz = e.vz / sp;
+      const m = new T.Mesh(this.geo, new T.MeshStandardMaterial({ color: lin(0xffe27a), emissive: lin(col), emissiveIntensity: 0.55, roughness: 0.4 }));
+      m.scale.setScalar(0.2);   // viên đá bán kính 0,2 m
+      const tr = new T.Mesh(this.trailGeo, new T.MeshBasicMaterial({ color: lin(0xffe27a), transparent: true, opacity: 0.55, blending: T.AdditiveBlending, depthWrite: false }));
+      tr.scale.set(0.45, 0.45, 8); tr.position.z = -4.5; m.add(tr);   // vệt sáng dài ~1,6 m (đã bù tỉ lệ cha 0,2)
+      m.rotation.y = Math.atan2(ux, uz);
+      const b = { id: e.id, x: e.x, z: e.z, ux, uz, v: sp, left: e.len != null ? e.len : (e.left != null ? e.left : C.SNIPER.range), mesh: m };
+      this.world.stage.add(m); this.list.set(e.id, b);
+      if (catchUp > 0) this.advance(b, Math.min(catchUp, 0.5), null);
+      m.position.set(b.x, 0.6, b.z);
+      return b;
+    }
+    advance(b, dt, cb) {
+      const d = Math.min(b.v * dt, b.left);
+      b.x += b.ux * d; b.z += b.uz * d; b.left -= d;
+      if (b.left <= 1e-6) { this.remove(b.id); if (cb && cb.onEnd) cb.onEnd(b); }
+    }
+    update(dt, cb) {
+      for (const b of Array.from(this.list.values())) {
+        this.advance(b, dt, cb);
+        if (this.list.has(b.id)) b.mesh.position.set(b.x, 0.6, b.z);
+      }
+    }
+    remove(id) {
+      const b = this.list.get(id); if (!b) return null;
+      this.world.stage.remove(b.mesh); b.mesh.material.dispose(); b.mesh.children.forEach((c) => c.material.dispose());
+      this.list.delete(id); return b;
+    }
+    clear() { for (const id of Array.from(this.list.keys())) this.remove(id); }
+  }
+
   /* ---------- vật phẩm ---------- */
   const _spriteCache = {};
   function emojiTex(e) {
@@ -409,5 +449,5 @@
     }
   }
 
-  PP.Arena = { createRenderer, applyQuality, build, makeShield, makeIce, makeTeamRing, Bullets, Pickups, Fx, PK, TEAM_COL, qOf };
+  PP.Arena = { createRenderer, applyQuality, build, makeShield, makeIce, makeTeamRing, Bullets, Stones, Pickups, Fx, PK, TEAM_COL, qOf };
 })(window.PP);

@@ -19,7 +19,8 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
      Đầu ván và mỗi lần hồi sinh đều BẤT TỬ 2 giây.
    - Mỗi lần xuất hiện có 100 máu.
    - Súng nước: 1 viên / 0,5s, băng 5 viên rồi nạp 1,5s. 10 máu / viên. Không xuyên vật cản, đạn nảy tối đa 5 lần vào tường và chướng ngại vật.
-   - Ná cao su: 1 phát / 1s, 50 máu, xuyên mọi vật thể và mọi kẻ địch trên đường bắn.
+   - Ná cao su: 1 phát / 1,2s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 32 m/s (né được, cần ngắm đón đầu),
+     xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Tầm bay tối đa 40m.
    - Cứ 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân (tối đa 8 cái, biến mất sau 16s):
        ❤️ Hồi 10 máu   💪 +10 sát thương mỗi phát trong 2s (không cộng dồn, nhặt thêm chỉ tính lại 2s)
        🛡️ Khiên 2s (miễn sát thương)   ❄️ Đóng băng đối phương 1s (không di chuyển được, vẫn ngắm và bắn được)
@@ -43,5 +44,5 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
 
 7) SỬA NHANH
    Hằng số (máu, sát thương, thời gian chọn súng, bất tử, hồi sinh, vật phẩm...) và 6 bản đồ: assets/config.js
-   Cân bằng súng: config.js > C.RIFLE (dmg, delay, mag...) và C.SNIPER (dmg, delay).
-   Bot: config.js (LEVELS) + assets/ai.js. Lõi luật: assets/shooter.js (chạy cả trên trình duyệt lẫn server).
+   Cân bằng súng: config.js > C.RIFLE (dmg, delay, mag...) và C.SNIPER (dmg, delay, speed, range).
+   Bot: config.js (LEVELS) + assets/ai.js (bot ngắm đón đầu cho cả súng nước lẫn ná, và né cả đá ná). Lõi luật: assets/shooter.js (chạy cả trên trình duyệt lẫn server).

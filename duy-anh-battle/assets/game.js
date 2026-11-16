@@ -62,7 +62,7 @@
   }
 
   /* ================= Three.js ================= */
-  let renderer, world = null, clock, bullets, pickups, fx, aimDots = [];
+  let renderer, world = null, clock, bullets, stones, pickups, fx, aimDots = [];
   const _v = new THREE.Vector3();
   let shake = 0, time = 0;
 
@@ -113,15 +113,16 @@
     for (const p of players.values()) { try { p.ch.dispose(); } catch (e) { /* bỏ qua */ } if (p.holder && p.holder.parent) p.holder.parent.remove(p.holder); }
     players.clear();
     if (bullets) bullets.clear();
+    if (stones) stones.clear();
     if (world) { try { world.dispose(); } catch (e) { /* bỏ qua */ } }
-    world = null; bullets = pickups = fx = null; aimDots = [];
+    world = null; bullets = stones = pickups = fx = null; aimDots = [];
     $('#tags').textContent = ''; $('#floaters').textContent = '';
   }
 
   function buildScene(mapId, list, tags) {
     disposeWorld();
     world = Arena.build(renderer, mapId, quality());
-    bullets = new Arena.Bullets(world); pickups = new Arena.Pickups(world); fx = new Arena.Fx(world);
+    bullets = new Arena.Bullets(world); stones = new Arena.Stones(world); pickups = new Arena.Pickups(world); fx = new Arena.Fx(world);
     const dotGeo = new THREE.CircleGeometry(0.07, 8), dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
     for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(dotGeo, dotMat.clone()); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.visible = false; world.stage.add(m); aimDots.push(m); }
     for (const p of list) {
@@ -180,7 +181,7 @@
     switch (e.t) {
       case 'select_start': {
         V.phase = 'select'; V.livesMax = e.lives; V.lives = { A: e.lives, B: e.lives }; V.selEnd = e.ts + e.select; ctl.selShown = -1; V.over = false;
-        if (bullets) bullets.clear(); if (pickups) pickups.clear();
+        if (bullets) bullets.clear(); if (stones) stones.clear(); if (pickups) pickups.clear();
         for (const pos of e.positions) { const p = players.get(pos.id); if (p) { p.x = pos.x; p.z = pos.z; p.aim = pos.aim; p.yaw = pos.aim; } }
         if (me) ctl.aim = me.aim;
         UI.hideScreens(); UI.banner(null); UI.setMsg('');
@@ -206,11 +207,16 @@
       }
       case 'snipe': {
         const p = players.get(e.owner);
-        fx.beam(e.x, e.z, e.ex, e.ez, 0xffe27a);
+        if (stones) stones.spawn(e, p ? p.team : 'A', now() - e.ts);
         fx.burst(e.x, e.z, 0xffe27a, 6, 2.5, 0.6, 0.07);
         if (p) p.kick = 1.6;
         A.snipeShot();
-        for (const id of e.hits) { const q = players.get(id); if (q) fx.ring(q.x, q.z, 0xffe27a, 2.2); }
+        break;
+      }
+      case 'spop': {
+        if (!stones) break;
+        const b = stones.remove(e.id);
+        if (b) fx.burst(e.x, e.z, 0xffe27a, 4, 1.5, 0.5, 0.06);
         break;
       }
       case 'hit': {
@@ -279,6 +285,7 @@
       case 'match_end': {
         V.phase = 'ending'; V.lives = e.lives;
         if (bullets) bullets.clear();
+        if (stones) stones.clear();
         for (const p of players.values()) p.celebrate = p.team === e.winner && p.alive;
         if (mode === 'spectate') UI.call(teamName(e.winner) + ' thắng!', '', 'good');
         else if (e.winner === myTeam) UI.call('CHIẾN THẮNG!', 'Đối thủ hết mạng', 'good');
@@ -563,6 +570,7 @@
       const sec = Math.ceil(left - 0.02);
       if (sec >= 1 && sec <= C.SELECT_TIME && sec !== ctl.selShown) { ctl.selShown = sec; if (sec <= 3) A.beep(false); }
     }
+    stones.update(dt, null);
     bullets.update(dt, t, {
       onBounce(b) { fx.burst(b.x, b.z, 0x9fe0ff, 2, 1.2, 0.55, 0.05); if (Math.random() < 0.5) A.bubbleBounce(); },
       onPop(b) { fx.burst(b.x, b.z, 0x9fe0ff, 4, 1.5, 0.55, 0.06); },
@@ -1256,7 +1264,7 @@
       case 'chat': addChat(m.name, m.text, m.sys); break;
       case 'match_start': startOnlineMatch(m); break;
       case 'sync': if (session) applySync(m.snapshot); break;
-      case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'hit': case 'dead': case 'respawn': case 'bpop':
+      case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'spop': case 'hit': case 'dead': case 'respawn': case 'bpop':
       case 'pickup_spawn': case 'pickup_take': case 'pickup_expire': case 'match_end': case 'over': case 'paused': case 'resumed':
         if (session && session.matchId === m.matchId) applyEvent(m);
         break;
@@ -1400,6 +1408,7 @@
     }
     for (const pk of s.pickups) pickups.add(pk);
     for (const b of s.bullets) { const o = players.get(b.owner); bullets.spawn(b, o ? o.team : 'A', 0); }
+    for (const b of (s.stones || [])) { const o = players.get(b.owner); stones.spawn(b, o ? o.team : 'A', 0); }
     if (me) ctl.aim = me.aim;
     updateHUD();
     if (s.phase === 'paused') UI.banner('Đang chờ người chơi kết nối lại…');

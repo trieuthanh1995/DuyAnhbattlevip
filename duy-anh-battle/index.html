@@ -67,7 +67,7 @@
               <div class="seg level-cards" id="setup-level">
                 <button data-v="rookie"><b>🌱 Tập sự</b><small>Ngắm lệch, phản xạ chậm</small></button>
                 <button data-v="pro" class="sel"><b>⭐ Chuyên nghiệp</b><small>Biết né đạn, hay dùng ná</small></button>
-                <button data-v="ace"><b>🔥 Cao thủ</b><small>Né nhạy, ná xuyên tường</small></button>
+                <button data-v="ace"><b>🔥 Cao thủ</b><small>Né nhạy, đón đầu ná</small></button>
               </div></div>
             <div class="opt-row"><span class="opt-l">Số mạng</span>
               <div><div class="seg" id="setup-lives"><button data-v="5" class="sel">5 mạng</button><button data-v="7">7 mạng</button><button data-v="11">11 mạng</button><button data-v="22" class="hidden">22 mạng</button></div>
@@ -123,7 +123,7 @@
         <li><b>Hồi sinh:</b> còn mạng thì hồi sinh ngẫu nhiên ở một chỗ trên bản đồ. Đầu ván và mỗi lần hồi sinh đều có <b>bất tử 2 giây</b>.</li>
         <li><b>Máu:</b> mỗi lần xuất hiện bạn có <b>100 máu</b>.</li>
         <li><b>💦 Súng nước:</b> 1 viên / 0,5 giây, băng 5 viên rồi nạp 1,5 giây, mất <b>10 máu</b>/viên. Đạn <b>không xuyên vật cản</b> nhưng <b>nảy tối đa 5 lần</b> vào tường và chướng ngại vật.</li>
-        <li><b>🎯 Ná cao su:</b> 1 phát / giây, <b>xuyên mọi vật thể</b> và mọi kẻ địch trên đường bắn, mất <b>50 máu</b>/phát.</li>
+        <li><b>🎯 Ná cao su:</b> 1 phát / 1,2 giây, mất <b>40 máu</b>/phát (3 phát hạ 1 người). Viên đá <b>bay thẳng 32 m/s</b> nên <b>có thể né được</b>, nhưng <b>xuyên mọi vật cản</b> và mọi kẻ địch trên đường bay. Nhớ <b>ngắm đón đầu</b> khi đối thủ đang chạy.</li>
         <li><b>Vật phẩm:</b> cứ mỗi 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân. Chạy qua để nhặt:
           <br>❤️ <b>Hồi máu</b> +10 · 💪 <b>Sức mạnh</b> +10 sát thương mỗi phát trong 2 giây (không cộng dồn, nhặt thêm chỉ tính lại 2 giây) · 🛡️ <b>Khiên</b> miễn sát thương 2 giây · ❄️ <b>Đóng băng</b> đối thủ không di chuyển được trong 1 giây (vẫn ngắm và bắn được).</li>
         <li><b>Đạn của đồng đội:</b> bay xuyên qua nhau, không gây sát thương cho đồng đội.</li>
@@ -146,7 +146,7 @@
         <h2>Tủ đồ</h2>
         <h3>Vũ khí</h3>
         <div class="seg" id="wd-weapon"><button data-v="rifle">💦 Súng nước</button><button data-v="sniper">🎯 Ná cao su</button></div>
-        <p class="note">Súng nước: 10 máu/viên, bắn liên tục, đạn nảy 5 lần. Ná cao su: 50 máu/phát, xuyên vật thể. Đầu mỗi ván có 5 giây để chọn lại, sau đó khóa luôn.</p>
+        <p class="note">Súng nước: 10 máu/viên, bắn liên tục, đạn nảy 5 lần. Ná cao su: 40 máu/phát, 1 phát/1,2s, đạn bay 32 m/s xuyên vật cản. Đầu mỗi ván có 5 giây để chọn lại, sau đó khóa luôn.</p>
         <h3>Nhân vật</h3>
         <div class="char-grid mini" id="wd-chars"></div>
         <div id="wd-colors"></div>
@@ -368,7 +368,7 @@
     <div id="fxbar"></div>
     <div id="wpn">
       <button class="w sel" id="w-rifle" data-w="rifle"><span class="ic">💦</span><span class="wt"><b>Súng nước</b><span class="pips" id="w-rifle-pips"></span></span><i class="cd" id="w-rifle-cd"></i></button>
-      <button class="w" id="w-sniper" data-w="sniper"><span class="ic">🎯</span><span class="wt"><b>Ná bắn tỉa</b><small>50 máu · xuyên vật</small></span><i class="cd" id="w-sniper-cd"></i></button>
+      <button class="w" id="w-sniper" data-w="sniper"><span class="ic">🎯</span><span class="wt"><b>Ná bắn tỉa</b><small>40 máu · xuyên vật</small></span><i class="cd" id="w-sniper-cd"></i></button>
     </div>
     <div id="legend"><span><b>Đi</b> WASD</span><span><b>Ngắm</b> chuột</span><span><b>Bắn</b> bấm chuột / Space</span><span><b>Tạm dừng</b> Esc</span><span><b>Mũi tên</b> chỉ hướng đối thủ ngoài màn hình</span></div>
   </div>
@@ -380,7 +380,7 @@
       <p>Chốt sau <b id="pick-t">5</b> giây · hết giờ là khóa, không đổi được cả ván</p>
       <div class="pick-row">
         <button data-w="rifle"><span class="pi">💦</span><b>Súng nước</b><small>10 máu/viên · 1 viên/0,5s<br>băng 5 viên · đạn nảy 5 lần</small></button>
-        <button data-w="sniper"><span class="pi">🎯</span><b>Ná cao su</b><small>50 máu/phát · 1 phát/1s<br>xuyên mọi vật thể</small></button>
+        <button data-w="sniper"><span class="pi">🎯</span><b>Ná cao su</b><small>40 máu/phát · 1 phát/1,2s<br>đạn bay nhanh, xuyên vật cản</small></button>
       </div>
     </div>
   </div>

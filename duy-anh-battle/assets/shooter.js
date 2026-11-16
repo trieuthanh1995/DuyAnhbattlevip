@@ -2,7 +2,7 @@
  * Hệ tọa độ: mặt sân là mặt phẳng (x, z). Hướng ngắm `aim` (rad): hướng = (sin aim, cos aim).
  * Đội A xuất phát bên trái (x<0), đội B bên phải (x>0).
  * Sim phát sự kiện vào hàng đợi drain():
- *   select_start, fight, shoot, snipe, hit, dead, respawn, bpop, pickup_spawn, pickup_take, pickup_expire, match_end, over, paused, resumed */
+ *   select_start, fight, shoot, snipe (đạn ná bay), spop (đạn ná hết đường), hit, dead, respawn, bpop, pickup_spawn, pickup_take, pickup_expire, match_end, over, paused, resumed */
 (function (root, factory) {
   const isNode = typeof module === 'object' && module.exports;
   const cfg = isNode ? require('./config.js') : root.PP;
@@ -138,7 +138,7 @@
       }));
       this.phase = 'idle';
       this.t = 0; this.wall = 0; this.last = null; this.acc = 0;
-      this.bullets = []; this.pickups = []; this.bid = 0; this.pid = 0;
+      this.bullets = []; this.stones = []; this.pickups = []; this.bid = 0; this.pid = 0;
       this.selectEnd = 0; this.nextPickup = 0; this.endAt = 0; this.winner = null;
       this.out = [];
     }
@@ -216,6 +216,7 @@
       if (this.phase !== 'fight') return;
       this.updatePlayers();
       this.updateBullets(dt);
+      this.updateStones(dt);
       this.updatePickups();
     }
     beginFight() {
@@ -278,20 +279,42 @@
       if (p.ammo <= 0) p.reloadUntil = this.t + R.reload;
       this.emit({ t: 'shoot', id: b.id, owner: p.id, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, ammo: p.ammo });
     }
+    /** Ná cao su: bắn ra 1 viên đá bay thẳng 32 m/s, xuyên vật cản và mọi kẻ địch (mỗi người chỉ trúng 1 lần) */
     shootSnipe(p) {
       const S = C.SNIPER, dx = Math.sin(p.aim), dz = Math.cos(p.aim);
-      const len = Math.min(S.range, rayToBounds(this.map, p.x, p.z, dx, dz));
-      const dmg = this.dmgOf(p, S.dmg), hits = [];
       p.nextSnipe = this.t + S.delay;
-      for (const q of this.players) {
-        if (!q.alive || q.team === p.team) continue;
-        const rx = q.x - p.x, rz = q.z - p.z;
-        const s = rx * dx + rz * dz;
-        if (s < 0 || s > len + C.PLAYER_R) continue;
-        if (Math.abs(rx * dz - rz * dx) <= C.PLAYER_R + S.width) hits.push(q);
+      const sx = p.x + dx * 0.55, sz = p.z + dz * 0.55;
+      const len = Math.min(S.range, rayToBounds(this.map, p.x, p.z, dx, dz));
+      const st = { id: ++this.bid, owner: p.id, team: p.team, x: sx, z: sz, vx: dx * S.speed, vz: dz * S.speed,
+        dist: 0, len, dmg: this.dmgOf(p, S.dmg), hit: [] };
+      this.stones.push(st);
+      this.emit({ t: 'snipe', id: st.id, owner: p.id, x: st.x, z: st.z, vx: st.vx, vz: st.vz, len, dmg: st.dmg });
+    }
+    updateStones(dt) {
+      const S = C.SNIPER, rr = C.PLAYER_R + S.width;
+      for (let i = this.stones.length - 1; i >= 0; i--) {
+        const st = this.stones[i];
+        const step = Math.min(S.speed * dt, st.len - st.dist);
+        const ux = st.vx / S.speed, uz = st.vz / S.speed;
+        const x0 = st.x, z0 = st.z;
+        // quét đoạn x0→x1 để đạn nhanh không xuyên qua người
+        for (const q of this.players) {
+          if (!q.alive || q.team === st.team || st.hit.includes(q.id)) continue;
+          const rx = q.x - x0, rz = q.z - z0;
+          const s = Math.max(0, Math.min(step, rx * ux + rz * uz));
+          const cx = rx - ux * s, cz = rz - uz * s;
+          if (cx * cx + cz * cz <= rr * rr) {
+            st.hit.push(q.id);
+            this.damage(q, this.player(st.owner) || { id: st.owner }, st.dmg, 'snipe');
+            if (this.phase !== 'fight') return;
+          }
+        }
+        st.x += ux * step; st.z += uz * step; st.dist += step;
+        if (st.dist >= st.len - 1e-6) {
+          this.stones.splice(i, 1);
+          this.emit({ t: 'spop', id: st.id, x: st.x, z: st.z });
+        }
       }
-      this.emit({ t: 'snipe', owner: p.id, x: p.x, z: p.z, ex: p.x + dx * len, ez: p.z + dz * len, hits: hits.map((q) => q.id), dmg });
-      for (const q of hits) this.damage(q, p, dmg, 'snipe');
     }
 
     damage(q, by, dmg, kind) {
@@ -308,7 +331,7 @@
       q.respawnAt = this.t + C.RESPAWN_DELAY;
       this.emit({ t: 'dead', id: q.id, by: by.id, lives: Object.assign({}, this.lives), respawn: this.lives[q.team] > 0 });
       if (this.lives[q.team] <= 0) {
-        this.phase = 'ending'; this.winner = other(q.team); this.endAt = this.t + C.END_DELAY; this.bullets = [];
+        this.phase = 'ending'; this.winner = other(q.team); this.endAt = this.t + C.END_DELAY; this.bullets = []; this.stones = [];
         this.emit({ t: 'match_end', winner: this.winner, lives: Object.assign({}, this.lives) });
       }
     }
@@ -385,7 +408,7 @@
 
     pause() {
       if (this.phase === 'over') return;
-      this.phase = 'paused'; this.bullets = []; this.pickups = [];
+      this.phase = 'paused'; this.bullets = []; this.stones = []; this.pickups = [];
       this.emit({ t: 'paused' });
     }
     /** Kết nối lại sau khi bị tạm dừng: ván đấu tiếp tục (mạng đã mất vẫn giữ nguyên) */
@@ -402,7 +425,7 @@
     }
     forfeit(team) {
       if (this.phase === 'over') return;
-      this.phase = 'over'; this.winner = other(team); this.bullets = [];
+      this.phase = 'over'; this.winner = other(team); this.bullets = []; this.stones = [];
       this.emit({ t: 'over', winner: this.winner, lives: Object.assign({}, this.lives), reason: 'forfeit' });
     }
 
@@ -421,6 +444,7 @@
         livesMax: this.livesMax, sel: Math.max(0, +(this.selectEnd - this.t).toFixed(2)),
         pickups: this.pickups.map((q) => ({ id: q.id, type: q.type, x: q.x, z: q.z, life: Math.max(0, +(q.until - this.t).toFixed(1)) })),
         bullets: this.bullets.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, bounces: b.bounces })),
+        stones: this.stones.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, left: Math.max(0, +(b.len - b.dist).toFixed(2)) })),
         ts: this.wall,
       });
     }
