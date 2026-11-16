@@ -7,7 +7,7 @@
   else { root.PP = root.PP || {}; Object.assign(root.PP, mod); }
 })(typeof self !== 'undefined' ? self : this, function (cfg) {
   'use strict';
-  const PROTOCOL_VERSION = 2;
+  const PROTOCOL_VERSION = 3;
   const ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const MODES = ['1v1', '2v2'];
   const LIVES = cfg.C.LIVES;
@@ -51,6 +51,11 @@
     room_ready: (m) => typeof m.ready === 'boolean',
     room_start: () => true,
     chat: (m) => isStr(m.text, 200, 1),
+    // chat thoại (WebRTC): server chỉ chuyển tin báo hiệu, không đụng tới âm thanh
+    voice_join: () => true,
+    voice_leave: () => true,
+    voice_mute: (m) => typeof m.muted === 'boolean',
+    voice_signal: (m) => isStr(m.to, 16, 1) && isObj(m.data) && JSON.stringify(m.data).length <= 6000,
     // trạng thái người chơi: vị trí, vận tốc, hướng ngắm, đang bóp cò (súng đã chốt từ đầu ván)
     input: (m) => isNum(m.x, -30, 30) && isNum(m.z, -30, 30) && isNum(m.vx, -20, 20) && isNum(m.vz, -20, 20) &&
       isNum(m.aim, -10, 10) && typeof m.fire === 'boolean',

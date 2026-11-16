@@ -48,3 +48,18 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
    Hằng số (máu, sát thương, thời gian chọn súng, bất tử, hồi sinh, vật phẩm...) và 6 bản đồ: assets/config.js
    Cân bằng súng: config.js > C.RIFLE (dmg, delay, mag, bounces...), C.BREAK (số nhát phá 3–5, mức thu nhỏ) và C.SNIPER (dmg, delay, speed, range).
    Bot: config.js (LEVELS) + assets/ai.js (bot ngắm đón đầu cho cả súng nước lẫn ná, và né cả đá ná). Lõi luật: assets/shooter.js (chạy cả trên trình duyệt lẫn server).
+
+Chat thoại online (WebRTC, làm giống game Pickle Ball):
+   - Trong phòng online bấm "Bật chat thoại" (cần HTTPS hoặc localhost để trình duyệt cho dùng micro). Mic có 2 chế độ:
+     mở mic liên tục (có nút tắt/bật mic) hoặc giữ để nói (giữ nút 🗣 hoặc giữ phím T). Trong trận có nút mic nhỏ ở góc trên bên trái,
+     kèm ảnh những người đang trong thoại, ai đang nói thì viền sáng xanh. Có người nói thì nhạc nền và hiệu ứng tự nhỏ lại.
+   - Âm thanh đi thẳng giữa các máy; server chỉ chuyển tin báo hiệu (offer/answer/ICE) trong cùng phòng, không nhận hay lưu âm thanh.
+     Chỉ người chơi trong phòng nghe và nói được; khán giả xem trực tiếp không vào thoại.
+   - Chỉnh được: Âm lượng thoại (mặc định 200%, tối đa 300%), Độ to mic của bạn (mặc định 180%), âm lượng và tắt tiếng riêng từng người.
+   - Để nối được ở mọi loại mạng (4G, wifi công ty) nên thêm máy chủ TURN. Đặt biến môi trường trên Render:
+       TURN_URL   = turn:tên-máy-chủ:443?transport=tcp   (nhiều địa chỉ: ngăn cách bằng dấu phẩy)
+       TURN_USER  = tên đăng nhập
+       TURN_PASS  = mật khẩu
+     hoặc ICE_SERVERS = chuỗi JSON mảng iceServers do nhà cung cấp (Metered, Cloudflare, Twilio…) đưa cho bạn.
+     Kiểm tra tại  https://tên-game.onrender.com/ice
+   - File: assets/voice.js (WebRTC), game-server.js (chuyển tin báo hiệu), server.js (đường /ice), phần "Chat thoại" trong assets/game.js.

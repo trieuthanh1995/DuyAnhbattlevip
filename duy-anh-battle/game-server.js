@@ -62,7 +62,7 @@ function roomState(room) {
     settings: room.settings, fillBots: room.fillBots, botLevel: room.botLevel, inMatch: room.inMatch,
     players: room.members.map((m) => {
       const p = players.get(m.pid);
-      return { id: m.pid, name: p.name, char: p.char, team: m.team, ready: m.ready, connected: !!p.conn };
+      return { id: m.pid, name: p.name, char: p.char, team: m.team, ready: m.ready, connected: !!p.conn, voice: !!p.voice, vmuted: !!p.vmuted };
     }),
   };
 }
@@ -110,10 +110,23 @@ function destroyRoomIfEmpty(room) {
   if (room.match) endMatchObj(room);
   rooms.delete(room.code);
 }
+/* ---------------- chat thoại: chỉ chuyển tin báo hiệu WebRTC trong cùng phòng (người chơi, không gồm khán giả) ---------------- */
+function voiceMates(room, exceptPid) {
+  return room.members.map((m) => players.get(m.pid)).filter((q) => q && q.pid !== exceptPid && q.voice && q.conn);
+}
+function voiceLeave(p) {
+  if (!p.voice) return;
+  p.voice = false; p.vmuted = false;
+  const room = p.room;
+  if (!room) return;
+  for (const q of voiceMates(room, p.pid)) sendP(q, { t: 'voice_left', id: p.pid });
+  pushRoomState(room);
+}
 function leaveRoom(p, silent) {
   if (p.spec) { p.spec.spectators.delete(p.pid); const sr = p.spec; p.spec = null; destroyRoomIfEmpty(sr); }
   const room = p.room;
   if (!room) return;
+  voiceLeave(p);
   const mem = member(room, p.pid);
   if (!mem) { p.room = null; return; }
   if (room.match && room.match.running) {
@@ -305,6 +318,27 @@ function handle(conn, m) {
       break;
     }
     case 'leaderboard': sendP(p, { t: 'leaderboard', top: lbTop() }); break;
+    case 'voice_join': {
+      const room = p.room; if (!room || !member(room, p.pid)) return;
+      p.voice = true;
+      const peers = voiceMates(room, p.pid);
+      sendP(p, { t: 'voice_peers', ids: peers.map((q) => q.pid) });          // người vào sau gửi offer cho người đã ở trong thoại
+      for (const q of peers) sendP(q, { t: 'voice_joined', id: p.pid });
+      pushRoomState(room);
+      break;
+    }
+    case 'voice_leave': voiceLeave(p); break;
+    case 'voice_mute': {
+      const room = p.room; if (!room || !p.voice) return;
+      p.vmuted = !!m.muted; pushRoomState(room);
+      break;
+    }
+    case 'voice_signal': {
+      const room = p.room, q = players.get(String(m.to));
+      if (!room || !p.voice || !q || q.room !== room || !q.voice || !q.conn) return;
+      sendP(q, { t: 'voice_signal', from: p.pid, data: m.data });
+      break;
+    }
     case 'queue_join': {
       if (p.room) leaveRoom(p);
       dequeue(p);
@@ -436,6 +470,7 @@ function onClose(conn) {
   if (!p || p.conn !== conn) return;
   p.conn = null;
   dequeue(p);
+  voiceLeave(p);
   if (p.spec) { const r = p.spec; r.spectators.delete(p.pid); p.spec = null; destroyRoomIfEmpty(r); }
   const room = p.room;
   if (!room) { setTimeout(() => { if (!p.conn && !p.room) players.delete(p.pid); }, 60000).unref(); return; }

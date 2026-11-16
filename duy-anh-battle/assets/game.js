@@ -12,7 +12,7 @@
   const hexStr = (n) => '#' + n.toString(16).padStart(6, '0');
 
   /* ================= Lưu trữ ================= */
-  const DEFAULT_SETTINGS = { quality: 'auto', volume: 80, music: true, sfx: true, musicVol: 50, aimline: true, shake: true };
+  const DEFAULT_SETTINGS = { quality: 'auto', volume: 80, music: true, sfx: true, musicVol: 50, aimline: true, shake: true, voiceVol: 200, voiceMic: 180 };
   const Save = {
     data: { wins: 0, losses: 0, char: 'bunny', level: 'pro', venue: 'candy', lives: 5, weapon: 'rifle', mode: 1, muted: false, name: '', deviceId: '', settings: {}, looks: {} },
     load() {
@@ -708,6 +708,7 @@
   }
   function goMenu() {
     endSession();
+    PP.Voice.disable(true);
     if (net) { net.send({ t: 'queue_leave' }); if (room) net.send({ t: 'room_leave' }); net.close(); net = null; room = null; }
     mode = 'menu';
     buildMenuScene();
@@ -1225,6 +1226,7 @@
         hudPing();
       },
     });
+    PP.Voice.sendFn = (msg) => !!(net && net.send(msg));
     net.connect();
     return net;
   }
@@ -1251,7 +1253,9 @@
         if (UI.visible('scr-queue')) { stopQueueTimer(); UI.show('scr-online'); UI.toast('Mất kết nối khi đang tìm trận, hãy tìm lại nhé'); }
         if (pendingRoom) { net.send({ t: 'room_join', code: pendingRoom }); pendingRoom = null; }
         net.send({ t: 'leaderboard' });
+        PP.Voice.onSocketOpen();             // kết nối lại: server đã coi mình rời thoại → nối lại từ đầu
         break;
+      case 'voice_peers': case 'voice_joined': case 'voice_left': case 'voice_signal': PP.Voice.handle(m); break;
       case 'error':
         UI.toast(m.message || 'Có lỗi xảy ra');
         if (m.code === 'version') UI.banner('Game đã có bản mới. Vui lòng tải lại trang.');
@@ -1265,13 +1269,16 @@
         break;
       case 'room_state':
         room = m;
+        PP.Voice.syncRoster(m.players);
         if (session) hudPing();
         stopQueueTimer();
         renderRoom();
+        voiceRender(false);
         if (!session) UI.show('scr-room');
         break;
       case 'room_left':
         room = null;
+        PP.Voice.disable(true);
         if (!session) UI.show('scr-online');
         break;
       case 'chat': addChat(m.name, m.text, m.sys); break;
@@ -1367,6 +1374,118 @@
     $('#btn-room-start').disabled = !!room.inMatch;
   }
 
+  /* ================= Chat thoại ================= */
+  let voiceSig = '', voiceNote = '';
+  const Voice = PP.Voice;
+  Voice.onNote = (t) => { voiceNote = t; UI.toast(t, 4200); voiceRender(true); };
+  let duckOff = 0, ducked = false;
+  Voice.onChange = () => {
+    voiceRender(false);
+    const sp = Voice.active && Voice.othersSpeaking();                 // có người khác đang nói → hạ nhạc nền/hiệu ứng để nghe rõ
+    if (sp) { clearTimeout(duckOff); duckOff = 0; if (!ducked) { ducked = true; A.duck(true); } }
+    else if (ducked && !Voice.active) { clearTimeout(duckOff); duckOff = 0; ducked = false; A.duck(false); }
+    else if (ducked && !duckOff) duckOff = setTimeout(() => { duckOff = 0; ducked = false; A.duck(false); }, 700);
+  };
+  const voiceHumans = () => (room ? room.players.filter((p) => p.connected) : []);
+  function voiceRender(force) {
+    const players = voiceHumans();
+    const sig = [Voice.active, Voice.listenOnly, Voice.muted, Voice.mode, Voice.pttDown, Voice.audioBlocked, mode, voiceNote].join('|') + '#' +
+      players.map((p) => p.id + (p.voice ? 'v' : '-') + (p.vmuted ? 'm' : '') + ((Voice.peerInfo(p.id) || {}).state || '') + ((Voice.peerInfo(p.id) || {}).muted ? 'x' : '')).join(',');
+    if (force || sig !== voiceSig) { voiceSig = sig; voiceBuild(players); }
+    // chỉ cập nhật hiệu ứng "đang nói" (không dựng lại để không làm đứt thanh trượt)
+    for (const el of document.querySelectorAll('[data-vid]')) el.classList.toggle('speaking', Voice.speaking(el.dataset.vid === myPid ? 'me' : el.dataset.vid));
+  }
+  function voiceBuild(players) {
+    const why = Voice.unsupportedReason();
+    const tgl = $('#voice-toggle'), mu = $('#voice-mute'), md = $('#voice-mode'), pt = $('#voice-ptt'), list = $('#voice-list');
+    tgl.textContent = Voice.active ? '🎤 Tắt chat thoại' : '🎤 Bật chat thoại';
+    tgl.classList.toggle('primary', !Voice.active);
+    tgl.disabled = !!why && !Voice.active;
+    const live = Voice.active && !Voice.listenOnly;
+    mu.classList.toggle('hidden', !live); md.classList.toggle('hidden', !live);
+    mu.textContent = Voice.muted ? '🔇 Mic đang tắt (bấm để bật)' : '🎙 Mic đang bật (bấm để tắt)';
+    mu.classList.toggle('off', !!Voice.muted);
+    md.textContent = Voice.mode === 'ptt' ? 'Chế độ: giữ để nói' : 'Chế độ: mở mic';
+    pt.classList.toggle('hidden', !(live && Voice.mode === 'ptt'));
+    pt.classList.toggle('on', !!Voice.pttDown);
+    list.textContent = '';
+    for (const p of players) {
+      const li = document.createElement('li'); li.dataset.vid = p.id;
+      li.className = 'voice-row' + (p.voice ? '' : ' off');
+      li.append(UI.avatarEl(p.char, 'em'));
+      const nm = document.createElement('span'); nm.className = 'vname'; nm.textContent = p.name + (p.id === myPid ? ' (bạn)' : '');
+      li.append(nm);
+      const st = document.createElement('span'); st.className = 'vstate';
+      if (!p.voice) st.textContent = 'chưa bật thoại';
+      else if (p.id === myPid) st.textContent = Voice.listenOnly ? '🎧 chỉ nghe' : (Voice.micLive() ? '🔊 mic bật' : '🔇 mic tắt');
+      else {
+        const info = Voice.peerInfo(p.id);
+        st.textContent = p.vmuted ? '🔇 đang tắt mic' : (!info || info.state === 'connecting') ? '⏳ đang nối…' : info.state === 'failed' ? '⚠ không nối được' : '🔊 đã nối';
+      }
+      li.append(st);
+      if (p.id !== myPid && p.voice && Voice.peerInfo(p.id)) {
+        const info = Voice.peerInfo(p.id);
+        const vol = document.createElement('input'); vol.type = 'range'; vol.min = '0'; vol.max = '300'; vol.value = String(Math.round(info.vol * 100)); vol.title = 'Âm lượng của ' + p.name;
+        vol.oninput = () => Voice.setVolume(p.id, +vol.value / 100);
+        const mb = document.createElement('button'); mb.className = 'btn tiny ghost'; mb.textContent = info.muted ? '🔈' : '🔇'; mb.title = info.muted ? 'Bật tiếng người này' : 'Tắt tiếng người này';
+        mb.onclick = () => { Voice.setPeerMuted(p.id, !info.muted); };
+        li.append(vol, mb);
+      }
+      list.append(li);
+    }
+    const note = $('#voice-note');
+    note.textContent = why || voiceNote || (Voice.active ? (Voice.audioBlocked ? 'Chạm vào màn hình một lần để nghe được tiếng.' : '') : 'Bật chat thoại để nói chuyện với người cùng phòng. Âm thanh đi thẳng giữa các máy, server không lưu.');
+    // nút mic nhỏ trong trận
+    let vh = $('#voice-hud');
+    if (!vh) { vh = document.createElement('div'); vh.id = 'voice-hud'; $('#hud').append(vh); }
+    const showHud = mode === 'online' && players.length > 1;
+    vh.classList.toggle('hidden', !showHud);
+    vh.textContent = '';
+    if (showHud) {
+      const b = document.createElement('button'); b.className = 'vh-btn' + (live && !Voice.micLive() ? ' off' : '') + (Voice.active ? ' on' : '');
+      b.textContent = !Voice.active ? '🎤' : Voice.listenOnly ? '🎧' : Voice.mode === 'ptt' ? (Voice.pttDown ? '🗣' : '🎙') : (Voice.muted ? '🔇' : '🎙');
+      b.title = !Voice.active ? 'Bật chat thoại' : Voice.mode === 'ptt' ? 'Giữ để nói (hoặc giữ phím T)' : 'Bật / tắt mic';
+      if (Voice.active && Voice.mode === 'ptt') {
+        b.onpointerdown = (e) => { e.preventDefault(); Voice.setPtt(true); };
+        b.onpointerup = b.onpointerleave = b.onpointercancel = () => Voice.setPtt(false);
+      } else {
+        b.onclick = () => { A.click(); if (!Voice.active) { Voice.enable(); } else if (!Voice.listenOnly) Voice.toggleMute(); };
+      }
+      vh.append(b);
+      if (Voice.active) for (const p of players) {
+        if (!p.voice) continue;
+        const c = document.createElement('span'); c.className = 'vh-chip'; c.dataset.vid = p.id; c.title = p.name;
+        c.append(UI.avatarEl(p.char, 'em'));
+        if (p.id === myPid ? !Voice.micLive() : p.vmuted) { const x = document.createElement('i'); x.textContent = '🔇'; c.append(x); }
+        vh.append(c);
+      }
+    }
+  }
+  function bindVoice() {
+    Voice.mode = Save.data.voiceMode === 'ptt' ? 'ptt' : 'open';
+    const vm = $('#voice-master'), vmic = $('#voice-mic');
+    const showVals = () => { $('#voice-master-val').textContent = vm.value + '%'; $('#voice-mic-val').textContent = vmic.value + '%'; };
+    vm.value = S().voiceVol; vmic.value = S().voiceMic; Voice.setMaster(S().voiceVol / 100); Voice.setMicGain(S().voiceMic / 100); showVals();
+    vm.oninput = () => { S().voiceVol = +vm.value; Voice.setMaster(+vm.value / 100); Save.save(); showVals(); };
+    vmic.oninput = () => { S().voiceMic = +vmic.value; Voice.setMicGain(+vmic.value / 100); Save.save(); showVals(); };
+    $('#voice-toggle').onclick = () => {
+      A.click();
+      if (Voice.active) { Voice.disable(); voiceNote = ''; } else { voiceNote = ''; Voice.enable().then((ok) => { if (!ok) voiceRender(true); }); }
+    };
+    $('#voice-mute').onclick = () => { A.click(); Voice.toggleMute(); };
+    $('#voice-mode').onclick = () => {
+      A.click(); Voice.setMode(Voice.mode === 'ptt' ? 'open' : 'ptt'); Save.data.voiceMode = Voice.mode; Save.save(); voiceRender(true);
+    };
+    const pt = $('#voice-ptt');
+    pt.onpointerdown = (e) => { e.preventDefault(); Voice.setPtt(true); };
+    pt.onpointerup = pt.onpointerleave = pt.onpointercancel = () => Voice.setPtt(false);
+    // phím T = giữ để nói (không khi đang gõ chữ)
+    const typing = (e) => { const t = e.target; return t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && t.type !== 'range'; };
+    window.addEventListener('keydown', (e) => { if (e.code === 'KeyT' && !e.repeat && !typing(e)) Voice.setPtt(true); });
+    window.addEventListener('keyup', (e) => { if (e.code === 'KeyT') Voice.setPtt(false); });
+    window.addEventListener('blur', () => Voice.setPtt(false));
+  }
+
   function addChat(name, text, sys) {
     const log = $('#chat-log');
     const p = document.createElement('p');
@@ -1407,6 +1526,7 @@
     hudPing();
     net.watch = true;
     updateHUD();
+    voiceRender(true);                   // hiện nút mic nhỏ trong trận
     if (spect) UI.setMsg('Đang xem trực tiếp');
   }
 
@@ -1473,6 +1593,7 @@
       if (mode === 'offline' && session.cfg.cup) { Cup.record(false, { A: 0, B: 1 }); endSession(); mode = 'menu'; buildMenuScene(); Cup.open(); return; }
       if (mode === 'offline') { goMenu(); return; }
       if (mode === 'spectate') net.send({ t: 'spectate_leave' }); else net.send({ t: 'room_leave' });
+      PP.Voice.disable(true);
       endSession(); mode = 'menu'; buildMenuScene(); room = null;
       goOnline();
     };
@@ -1540,7 +1661,8 @@
       net.send({ t: 'room_ready', ready: !(meP && meP.ready) });
     };
     $('#btn-room-start').onclick = () => { A.click(); net.send({ t: 'room_start' }); };
-    $('#btn-room-leave').onclick = () => { A.click(); net.send({ t: 'room_leave' }); room = null; $('#chat-log').textContent = ''; UI.show('scr-online'); };
+    $('#btn-room-leave').onclick = () => { A.click(); net.send({ t: 'room_leave' }); PP.Voice.disable(true); room = null; $('#chat-log').textContent = ''; UI.show('scr-online'); };
+    bindVoice();
     $('#chat-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const inp = $('#chat-input');

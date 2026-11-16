@@ -9,7 +9,8 @@
   let ambWanted = { on: false, venue: null }, ambNodes = null;
   /* ---------- nhạc nền: 1 bản lặp vô hạn, không bao giờ dừng/khởi động lại giữa các trận ---------- */
   let musicEl = null, musicOn = true, musicVol = 0.5, musicStarted = false;
-  function musicEffVol() { return clamp(volume * musicVol * 1.6, 0, 1); }
+  let duckM = 1, duckS = 1, duckTM = 1, duckTS = 1, duckTimer = 0;   // hạ nhạc / hiệu ứng khi có người đang nói thoại
+  function musicEffVol() { return clamp(volume * musicVol * 1.6 * duckM, 0, 1); }
   function musicElement() {
     if (!musicEl) {
       try {
@@ -288,7 +289,7 @@
     if (!ctx) return;
     const t = ctx.currentTime;
     master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t);
-    master.gain.linearRampToValueAtTime(muted ? 0 : volume * 0.7, t + 0.08);
+    master.gain.linearRampToValueAtTime(muted ? 0 : volume * 0.7 * duckS, t + 0.08);
   }
 
 
@@ -318,7 +319,21 @@
   function beep(final) { tone(final ? 1046 : 660, final ? 0.3 : 0.12, 'triangle', 0.13); }
   function dead() { [440, 349, 262, 196].forEach((f, i) => tone(f, 0.2, 'triangle', 0.11, f * 0.9, i * 0.09)); }
 
+  /** Hạ nhạc nền + hiệu ứng khi có người đang nói chuyện để nghe rõ tiếng thoại, tự trả lại khi họ ngừng */
+  function duck(on) {
+    duckTM = on ? 0.25 : 1; duckTS = on ? 0.5 : 1;
+    if (duckTimer) return;
+    duckTimer = setInterval(() => {
+      const step = (cur, tgt) => (Math.abs(cur - tgt) < 0.03 ? tgt : cur + (tgt > cur ? 0.04 : -0.1));
+      duckM = step(duckM, duckTM); duckS = step(duckS, duckTS);
+      if (musicEl) musicEl.volume = musicEffVol();
+      setMasterGain();
+      if (duckM === duckTM && duckS === duckTS) { clearInterval(duckTimer); duckTimer = 0; }
+    }, 40);
+  }
+
   PP.Audio = {
+    duck,
     unlock() { musicStart(); return ensure(); },
     musicStart,
     setMusicOn(m) { musicOn = !!m; if (musicOn) musicStart(); else musicStop(); },

@@ -334,7 +334,22 @@
           </div>
         </div>
         <div class="panel chat">
-          <h3>Chat</h3>
+          <h3>Chat thoại 🎤</h3>
+          <div class="voice-box" id="voice-box">
+            <div class="voice-bar">
+              <button class="btn tiny primary" id="voice-toggle">🎤 Bật chat thoại</button>
+              <button class="btn tiny ghost hidden" id="voice-mute">🎙 Mic đang bật</button>
+              <button class="btn tiny ghost hidden" id="voice-mode">Chế độ: mở mic</button>
+            </div>
+            <div class="voice-sliders">
+              <label>🔊 Âm lượng thoại <input type="range" id="voice-master" min="0" max="300" step="10"><b id="voice-master-val"></b></label>
+              <label>🎙 Độ to mic của bạn <input type="range" id="voice-mic" min="50" max="300" step="10"><b id="voice-mic-val"></b></label>
+            </div>
+            <button class="btn tiny voice-ptt hidden" id="voice-ptt">🗣 Giữ để nói (hoặc giữ phím T)</button>
+            <ul class="voice-list" id="voice-list"></ul>
+            <p class="note" id="voice-note"></p>
+          </div>
+          <h3>Chat chữ</h3>
           <div class="chat-log" id="chat-log"></div>
           <form class="chat-form" id="chat-form"><input id="chat-input" maxlength="120" autocomplete="off" placeholder="Nhắn gì đó…"><button class="btn tiny">Gửi</button></form>
         </div>
@@ -422,14 +437,15 @@
   <script src="./assets/config.js?v=2"></script>
   <script src="./assets/shooter.js?v=2"></script>
   <script src="./assets/ai.js?v=2"></script>
-  <script src="./assets/protocol.js?v=2"></script>
-  <script src="./assets/audio.js?v=2"></script>
+  <script src="./assets/protocol.js?v=3"></script>
+  <script src="./assets/audio.js?v=3"></script>
   <script src="./assets/guns.js?v=2"></script>
   <script src="./assets/kit.js?v=1"></script>
   <script src="./assets/character.js?v=2"></script>
   <script src="./assets/arena.js?v=2"></script>
   <script src="./assets/input.js?v=2"></script>
   <script src="./assets/net.js?v=2"></script>
+  <script src="./assets/voice.js?v=1"></script>
   <script src="./assets/ui.js?v=2"></script>
-  <script src="./assets/game.js?v=2"></script>
+  <script src="./assets/game.js?v=3"></script>
 </body></html>
