@@ -122,8 +122,8 @@
         <li><b>Số mạng:</b> chọn 5, 7 hoặc 11 mạng (đấu đôi có thêm 22 mạng). Mỗi lần bị hạ là mất 1 mạng; hết mạng trước thì thua. Đấu đôi dùng chung mạng của cả đội.</li>
         <li><b>Hồi sinh:</b> còn mạng thì hồi sinh ngẫu nhiên ở một chỗ trên bản đồ. Đầu ván và mỗi lần hồi sinh đều có <b>bất tử 2 giây</b>.</li>
         <li><b>Máu:</b> mỗi lần xuất hiện bạn có <b>100 máu</b>.</li>
-        <li><b>💦 Súng nước:</b> 1 viên / 0,3 giây, băng 12 viên rồi thay đạn 0,5 giây, mất <b>10 máu</b>/viên. Đạn <b>không xuyên vật cản</b>, va chạm <b>3 lần</b>: 2 lần đầu <b>nảy</b>, lần thứ 3 đạn vỡ, nếu đập vào <b>vật cản</b> thì <b>phá mạnh</b> vật cản đó. Mỗi lần đạn <b>nảy</b> vào vật cản cũng làm <b>sứt nhẹ</b> (nửa nhát). Vật cản bé cần khoảng <b>3</b> viên, vật cản to cần khoảng <b>5</b> viên để phá hết (thu nhỏ dần rồi biến mất). <b>Tường bao quanh sân không bị phá.</b></li>
-        <li><b>🎯 Ná cao su:</b> 1 phát / 2 giây, mất <b>40 máu</b>/phát (3 phát hạ 1 người). Viên đá <b>bay thẳng 32 m/s</b> nên <b>có thể né được</b>, nhưng <b>xuyên mọi vật cản</b> và mọi kẻ địch trên đường bay. Nhớ <b>ngắm đón đầu</b> khi đối thủ đang chạy.</li>
+        <li><b>💦 Súng nước:</b> 1 viên / 0,3 giây, băng 10 viên rồi thay đạn 0,5 giây, mất <b>10 máu</b>/viên. Đạn <b>không xuyên vật cản</b>, va chạm <b>3 lần</b>: 2 lần đầu <b>nảy</b>, lần thứ 3 đạn vỡ, nếu đập vào <b>vật cản</b> thì <b>phá mạnh</b> vật cản đó. Mỗi lần đạn <b>nảy</b> vào vật cản cũng làm <b>sứt nhẹ</b> (nửa nhát). Vật cản bé cần khoảng <b>3</b> viên, vật cản to cần khoảng <b>5</b> viên để phá hết (thu nhỏ dần rồi biến mất). <b>Tường bao quanh sân không bị phá.</b></li>
+        <li><b>🎯 Ná cao su:</b> 1 phát / 1,5 giây, mất <b>40 máu</b>/phát (3 phát hạ 1 người). Viên đá <b>bay thẳng 32 m/s</b> nên <b>có thể né được</b>, nhưng <b>xuyên mọi vật cản</b> và mọi kẻ địch trên đường bay. Nhớ <b>ngắm đón đầu</b> khi đối thủ đang chạy.</li>
         <li><b>Vật phẩm:</b> cứ mỗi 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân. Chạy qua để nhặt:
           <br>❤️ <b>Hồi máu</b> +10 · 💪 <b>Sức mạnh</b> +10 sát thương mỗi phát trong 2 giây (không cộng dồn, nhặt thêm chỉ tính lại 2 giây) · 🛡️ <b>Khiên</b> miễn sát thương 2 giây · ❄️ <b>Đóng băng</b> đối thủ không di chuyển được trong 1 giây (vẫn ngắm và bắn được).</li>
         <li><b>Đạn của đồng đội:</b> bay xuyên qua nhau, không gây sát thương cho đồng đội.</li>
@@ -146,7 +146,7 @@
         <h2>Tủ đồ</h2>
         <h3>Vũ khí</h3>
         <div class="seg" id="wd-weapon"><button data-v="rifle">💦 Súng nước</button><button data-v="sniper">🎯 Ná cao su</button></div>
-        <p class="note">Súng nước: 10 máu/viên, băng 12 viên, đạn nảy 2 lần rồi phá vật cản ở lần va chạm thứ 3 (3–5 viên phá hết 1 vật cản). Ná cao su: 40 máu/phát, 1 phát/2s, đạn bay 32 m/s xuyên vật cản. Đầu mỗi ván có 5 giây để chọn lại, sau đó khóa luôn.</p>
+        <p class="note">Súng nước: 10 máu/viên, băng 10 viên, đạn nảy 2 lần rồi phá vật cản ở lần va chạm thứ 3 (3–5 viên phá hết 1 vật cản). Ná cao su: 40 máu/phát, 1 phát/1,5s, đạn bay 32 m/s xuyên vật cản. Đầu mỗi ván có 5 giây để chọn lại, sau đó khóa luôn.</p>
         <h3>Nhân vật</h3>
         <div class="char-grid mini" id="wd-chars"></div>
         <div id="wd-colors"></div>
@@ -379,8 +379,8 @@
       <h3>Chọn vũ khí</h3>
       <p>Chốt sau <b id="pick-t">5</b> giây · hết giờ là khóa, không đổi được cả ván</p>
       <div class="pick-row">
-        <button data-w="rifle"><span class="pi">💦</span><b>Súng nước</b><small>10 máu/viên · 1 viên/0,3s<br>băng 12 viên · lần nảy thứ 3 phá vật cản</small></button>
-        <button data-w="sniper"><span class="pi">🎯</span><b>Ná cao su</b><small>40 máu/phát · 1 phát/2s<br>đạn bay nhanh, xuyên vật cản</small></button>
+        <button data-w="rifle"><span class="pi">💦</span><b>Súng nước</b><small>10 máu/viên · 1 viên/0,3s<br>băng 10 viên · lần nảy thứ 3 phá vật cản</small></button>
+        <button data-w="sniper"><span class="pi">🎯</span><b>Ná cao su</b><small>40 máu/phát · 1 phát/1,5s<br>đạn bay nhanh, xuyên vật cản</small></button>
       </div>
     </div>
   </div>

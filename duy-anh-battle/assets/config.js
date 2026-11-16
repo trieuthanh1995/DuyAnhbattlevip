@@ -19,11 +19,11 @@
     RESPAWN_DELAY: 1.5,       // chờ trước khi hồi sinh ở vị trí ngẫu nhiên
     END_DELAY: 1.6,           // dừng một nhịp trước khi hiện bảng kết quả
     LIVES: [5, 7, 11, 22],    // số mạng mỗi bên (22 chỉ dành cho đấu đôi 2v2)
-    // Súng nước: 1 viên / 0,3s, băng 12 viên rồi thay đạn 0,5s, 10 máu/viên, không xuyên vật cản.
+    // Súng nước: 1 viên / 0,3s, băng 10 viên rồi thay đạn 0,5s, 10 máu/viên, không xuyên vật cản.
     // Đạn va chạm 3 lần: 2 lần đầu nảy, lần thứ 3 vỡ ra; nếu lần thứ 3 đập vào VẬT CẢN thì phá một phần vật cản đó (tường bao thì không).
-    RIFLE: { dmg: 10, delay: 0.3, mag: 12, reload: 0.5, speed: 11, r: 0.17, bounces: 3, life: 10 },
-    // Ná cao su: 1 viên / 2s, 40 máu (3 phát hạ 1 người), đạn đá bay 32 m/s (né được), xuyên vật cản và mọi kẻ địch trên đường bay
-    SNIPER: { dmg: 40, delay: 2.0, speed: 32, range: 40, width: 0.16 },
+    RIFLE: { dmg: 10, delay: 0.3, mag: 10, reload: 0.5, speed: 11, r: 0.17, bounces: 3, life: 10 },
+    // Ná cao su: 1 viên / 1,5s, 40 máu (3 phát hạ 1 người), đạn đá bay 32 m/s (né được), xuyên vật cản và mọi kẻ địch trên đường bay
+    SNIPER: { dmg: 40, delay: 1.5, speed: 32, range: 40, width: 0.16 },
     // phá vật cản: mỗi viên đạn vỡ ở lần va chạm thứ 3 vào vật cản = 1 "nhát". Vật cản bé cần hitsMin nhát, to cần hitsMax nhát
     // (nội suy theo diện tích so với vật cản bé/to nhất của mọi bản đồ). Mỗi nhát thu nhỏ dần, nhát cuối thì biến mất. minScale = cỡ còn lại ngay trước nhát cuối.
     // chip: mỗi lần đạn NẢY vào vật cản (lần va chạm 1, 2) cũng làm sứt nửa nhát, để súng nước phá nhanh hơn; lần thứ 3 vẫn tính trọn 1 nhát.
