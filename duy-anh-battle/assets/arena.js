@@ -16,6 +16,8 @@
     power: { emoji: '💪', color: 0xffb020, name: 'Tăng sức mạnh' },
     shield: { emoji: '🛡️', color: 0x4cc9f0, name: 'Khiên' },
     freeze: { emoji: '❄️', color: 0x9ad8ff, name: 'Đóng băng' },
+    bomb: { emoji: '💣', color: 0x6b6f8a, name: 'Bom ném' },
+    boots: { emoji: '👟', color: 0x5ee07a, name: 'Giày tăng tốc' },
   };
 
   function createRenderer(canvas, quality) {
@@ -430,6 +432,45 @@
     }
   }
 
+  /* ---------- bom ném: quả bom bay theo vòng cung tới điểm rơi, có vòng đỏ báo vùng nổ ---------- */
+  class Bombs {
+    constructor(world) { this.world = world; this.list = new Map(); }
+    add(e) {
+      if (this.list.has(e.id)) return;
+      const R = C.BOMB.radius;
+      const g = new T.Group();
+      const ball = new T.Mesh(new T.SphereGeometry(0.22, 16, 12), mat(0x2b2d42, { roughness: 0.35 }));
+      const fuse = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 0.14, 6), mat(0xffb020, { emissive: lin(0xffb020), emissiveIntensity: 0.9 }));
+      fuse.position.y = 0.27; g.add(ball, fuse);
+      const sx = e.fx == null ? e.x : e.fx, sz = e.fz == null ? e.z : e.fz;
+      g.position.set(sx, 0.9, sz);
+      const mark = new T.Group(); mark.position.set(e.x, 0.05, e.z);
+      const ring = new T.Mesh(new T.RingGeometry(R * 0.88, R, 40), new T.MeshBasicMaterial({ color: lin(0xff4040), transparent: true, opacity: 0.8, side: T.DoubleSide, depthWrite: false }));
+      const disc = new T.Mesh(new T.CircleGeometry(R * 0.88, 40), new T.MeshBasicMaterial({ color: lin(0xff4040), transparent: true, opacity: 0.18, side: T.DoubleSide, depthWrite: false }));
+      ring.rotation.x = disc.rotation.x = -Math.PI / 2; mark.add(disc, ring);
+      this.world.stage.add(g, mark);
+      const fall = e.fall || C.BOMB.fall;
+      this.list.set(e.id, { id: e.id, g, mark, disc, ring, sx, sz, x: e.x, z: e.z, fall, age: Math.max(0, fall - (e.left == null ? fall : e.left)) });
+    }
+    remove(id) {
+      const b = this.list.get(id); if (!b) return null;
+      this.world.stage.remove(b.g); this.world.stage.remove(b.mark);
+      for (const o of [b.g, b.mark]) o.traverse((m) => { if (m.material) m.material.dispose(); if (m.geometry) m.geometry.dispose(); });
+      this.list.delete(id); return b;
+    }
+    clear() { for (const id of Array.from(this.list.keys())) this.remove(id); }
+    update(dt, t) {
+      for (const b of this.list.values()) {
+        b.age += dt;
+        const k = Math.min(1, b.age / b.fall);
+        b.g.position.set(b.sx + (b.x - b.sx) * k, 0.9 * (1 - k) + 0.22 * k + 2.4 * Math.sin(Math.PI * k), b.sz + (b.z - b.sz) * k);
+        b.g.rotation.z += dt * 9;
+        const blink = 0.5 + 0.5 * Math.sin(t * (10 + 18 * k));
+        b.ring.material.opacity = 0.4 + 0.5 * blink; b.disc.material.opacity = 0.1 + 0.25 * k * blink;
+      }
+    }
+  }
+
   /* ---------- hiệu ứng hạt, tia ná ---------- */
   class Fx {
     constructor(world) { this.world = world; this.parts = []; this.beams = []; this.rings = []; this.geo = new T.SphereGeometry(1, 8, 6); }
@@ -479,5 +520,5 @@
     }
   }
 
-  PP.Arena = { createRenderer, applyQuality, build, makeShield, makeIce, makeTeamRing, Bullets, Stones, Pickups, Fx, PK, TEAM_COL, qOf };
+  PP.Arena = { createRenderer, applyQuality, build, makeShield, makeIce, makeTeamRing, Bullets, Stones, Pickups, Bombs, Fx, PK, TEAM_COL, qOf };
 })(window.PP);

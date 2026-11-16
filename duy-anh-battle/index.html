@@ -72,6 +72,9 @@
             <div class="opt-row"><span class="opt-l">Số mạng</span>
               <div><div class="seg" id="setup-lives"><button data-v="5" class="sel">5 mạng</button><button data-v="7">7 mạng</button><button data-v="11">11 mạng</button><button data-v="22" class="hidden">22 mạng</button></div>
               <p class="note">Mỗi bên có từng đó mạng, hết mạng trước thì thua. Đấu đôi dùng chung mạng của đội (có thêm mức 22). Bị hạ sẽ hồi sinh ngẫu nhiên và bất tử 2 giây.</p></div></div>
+            <div class="opt-row"><span class="opt-l">Máu mỗi trận</span>
+              <div><input type="number" id="setup-hp" class="num-in" min="100" max="1000" step="10" inputmode="numeric" placeholder="100">
+              <p class="note">Nhập từ 100 đến 1000 máu cho mỗi người mỗi lần xuất hiện. Để trống = 100 máu.</p></div></div>
           </section>
           <section class="panel venues">
             <div class="row-between"><h3>Bản đồ</h3><span class="venue-info" id="setup-venue-info"></span></div>
@@ -329,6 +332,7 @@
             <label>Bản đồ <select id="room-venue"></select></label>
             <img id="room-venue-thumb" class="venue-thumb hidden" alt="">
             <label>Số mạng <select id="room-lives"><option value="5">5 mạng</option><option value="7">7 mạng</option><option value="11">11 mạng</option><option value="22">22 mạng (đấu đôi)</option></select></label>
+            <label>Máu mỗi trận <input type="number" id="room-hp" class="num-in" min="100" max="1000" step="10" inputmode="numeric" placeholder="100"></label>
             <label id="room-fill-wrap" class="check"><input type="checkbox" id="room-fill"> Thêm bot vào chỗ trống
               <select id="room-botlevel"><option value="rookie">Tập sự</option><option value="pro">Chuyên nghiệp</option><option value="ace">Cao thủ</option></select></label>
           </div>

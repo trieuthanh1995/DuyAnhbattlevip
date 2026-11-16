@@ -87,7 +87,7 @@ function pickTeam(room) {
 function fixSettings(mode, s) {
   let lives = s.lives;
   if (mode !== '2v2' && lives === 22) lives = 11;
-  return { venue: s.venue, lives };
+  return { venue: s.venue, lives, hp: cfg.normHp(s.hp) };
 }
 
 function createRoom(host, mode, settings, quick) {
@@ -157,7 +157,7 @@ function matchStartMsg(room, forPid) {
   const mem = member(room, forPid);
   const msg = {
     t: 'match_start', matchId: M.id,
-    settings: { teamSize: sizeOf(room), lives: M.m.livesMax, venue: room.settings.venue },
+    settings: { teamSize: sizeOf(room), lives: M.m.livesMax, hp: M.m.hpBase, venue: room.settings.venue },
     players: M.roster,
   };
   if (mem) msg.yourTeam = mem.team;
@@ -185,7 +185,7 @@ function startMatch(room) {
     }
   }
   const seed = (Math.random() * 1e9) | 0;
-  const m = new Sim({ map: room.settings.venue, teamSize: size, lives: room.settings.lives, seed, players: plist });
+  const m = new Sim({ map: room.settings.venue, teamSize: size, lives: room.settings.lives, hp: room.settings.hp, seed, players: plist });
   const M = { id: ++matchSeq, m, roster, bots: [], timers: new Map(), running: true, lastT: now(), lastState: 0, startTimer: null };
   roster.filter((r) => r.isBot).forEach((r, i) => {
     M.bots.push({ id: r.id, brain: new BotBrain(m, r.id, room.botLevel, Shooter.mulberry32(seed + i + 1)) });
@@ -290,7 +290,7 @@ function dequeue(p) {
 }
 function launchQuick(mode, list, fill) {
   const host = players.get(list[0].pid);
-  const room = createRoom(host, mode, { venue: cfg.MAPS[(Math.random() * cfg.MAPS.length) | 0].id, lives: 5 }, true);
+  const room = createRoom(host, mode, { venue: cfg.MAPS[(Math.random() * cfg.MAPS.length) | 0].id, lives: 5, hp: cfg.C.HP }, true);
   room.fillBots = !!fill;
   for (let i = 1; i < list.length; i++) { const p = players.get(list[i].pid); if (p.room) leaveRoom(p, true); addMember(room, p); }
   for (const q of list) { const p = players.get(q.pid); sendP(p, { t: 'queue_status', waiting: false }); }

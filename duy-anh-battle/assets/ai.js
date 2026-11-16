@@ -58,8 +58,8 @@
       let best = null, bs = -Infinity;
       for (const q of pk) {
         const d = Math.hypot(q.x - p.x, q.z - p.z);
-        let w = q.type === 'heal' ? (p.hp < 70 ? 3 : 0.6) : q.type === 'freeze' ? 2 : q.type === 'power' ? 1.6 : 1.4;
-        if (q.type === 'heal' && p.hp < 40) w = 6;
+        let w = q.type === 'heal' ? (p.hp < p.hpMax * 0.7 ? 3 : 0.8) : q.type === 'freeze' ? 2 : q.type === 'power' ? 1.6 : q.type === 'bomb' ? 2.2 : q.type === 'boots' ? 1.3 : 1.4;
+        if (q.type === 'heal' && p.hp < p.hpMax * 0.4) w = 6;
         // đối thủ ở gần vật phẩm hơn thì bỏ
         if (en && Math.hypot(q.x - en.q.x, q.z - en.q.z) + 1 < d && d > 4) w *= 0.3;
         const s = w * 3 - d;
@@ -119,7 +119,7 @@
 
       // ---- di chuyển
       if (frozen || sim.phase !== 'fight') { p.vx = p.vz = 0; return; }
-      let dx = 0, dz = 0, speed = L.speed;
+      let dx = 0, dz = 0, speed = L.speed * (p.speedUntil > sim.t ? C.BOOST_MUL : 1);
       const inc = L.dodge > 0 ? this.incomingBullet(p) : null;
       this.goalT -= dt;
       if (this.goalT <= 0) { this.goalT = this.rand(0.5, 1.1); this.goal = this.chooseGoalPickup(p, en); }
@@ -145,6 +145,14 @@
           dx = ux * radial + -uz * this.strafe * 0.9; dz = uz * radial + ux * this.strafe * 0.9;
         }
         speed *= los ? 0.9 : 1;
+      }
+      // né bom đang rơi (bot chuyên nghiệp / cao thủ): chạy ra khỏi vùng nổ
+      if (L.dodge > 0) {
+        for (const b of sim.bombs) {
+          if (b.team === p.team) continue;
+          const rx = p.x - b.x, rz = p.z - b.z, bd = Math.hypot(rx, rz);
+          if (bd < C.BOMB.radius + 0.9 && this.rng() < 0.5 + L.dodge * 0.5) { dx = bd > 0.05 ? rx / bd : 1; dz = bd > 0.05 ? rz / bd : 0; break; }
+        }
       }
       // chống kẹt
       const moved = Math.hypot(p.x - this.lastX, p.z - this.lastZ);

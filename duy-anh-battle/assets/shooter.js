@@ -11,7 +11,7 @@
   else { root.PP = root.PP || {}; Object.assign(root.PP, mod); }
 })(typeof self !== 'undefined' ? self : this, function (cfg) {
   'use strict';
-  const { C, MAPS, PICKUP_TYPES, OBS_AREA, obsArea } = cfg;
+  const { C, MAPS, PICKUP_TYPES, OBS_AREA, obsArea, normHp } = cfg;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const other = (t) => (t === 'A' ? 'B' : 'A');
   const mapOf = (id) => MAPS.find((m) => m.id === id) || MAPS[0];
@@ -152,15 +152,16 @@
       const lv = C.LIVES.includes(opts.lives) ? opts.lives : 5;
       this.livesMax = (lv === 22 && this.teamSize === 1) ? 11 : lv;
       this.lives = { A: this.livesMax, B: this.livesMax };
+      this.hpBase = normHp(opts.hp);                    // máu mỗi lần xuất hiện (100–1000)
       this.rng = mulberry32((opts.seed >>> 0) || 1);
       this.players = opts.players.map((p) => ({
-        id: p.id, team: p.team, x: 0, z: 0, vx: 0, vz: 0, aim: 0, hp: C.HP, alive: true,
+        id: p.id, team: p.team, x: 0, z: 0, vx: 0, vz: 0, aim: 0, hp: this.hpBase, hpMax: this.hpBase, alive: true,
         weapon: p.weapon === 'sniper' ? 'sniper' : 'rifle', ammo: C.RIFLE.mag, reloadUntil: 0, nextRifle: 0, nextSnipe: 0,
-        shieldUntil: 0, freezeUntil: 0, power: 0, powerUntil: 0, fire: false, lastSet: 0, respawnAt: 0, lockUntil: 0, deaths: 0, kills: 0,
+        shieldUntil: 0, freezeUntil: 0, speedUntil: 0, power: 0, powerUntil: 0, fire: false, lastSet: 0, respawnAt: 0, lockUntil: 0, deaths: 0, kills: 0,
       }));
       this.phase = 'idle';
       this.t = 0; this.wall = 0; this.last = null; this.acc = 0;
-      this.bullets = []; this.stones = []; this.pickups = []; this.bid = 0; this.pid = 0;
+      this.bullets = []; this.stones = []; this.bombs = []; this.pickups = []; this.bid = 0; this.pid = 0;
       this.selectEnd = 0; this.nextPickup = 0; this.endAt = 0; this.winner = null;
       this.out = [];
     }
@@ -178,7 +179,7 @@
         p.x = sp[0]; p.z = sp[1]; p.vx = p.vz = 0;
         p.aim = p.team === 'A' ? Math.PI / 2 : -Math.PI / 2;
       }
-      this.emit({ t: 'select_start', lives: this.livesMax, select: C.SELECT_TIME,
+      this.emit({ t: 'select_start', lives: this.livesMax, hp: this.hpBase, select: C.SELECT_TIME,
         positions: this.players.map((p) => ({ id: p.id, x: p.x, z: p.z, aim: p.aim })) });
     }
     /** Chọn súng: chỉ được trong 5 giây đầu ván (sau đó đã khóa) */
@@ -207,7 +208,7 @@
       let nx = s.x, nz = s.z;
       if (strict) {
         const dt = clamp((now || 0) - p.lastSet, 0.01, 0.25);
-        const maxStep = C.SPEED * 1.3 * dt + 0.15;
+        const maxStep = C.SPEED * 1.3 * (p.speedUntil > this.t ? C.BOOST_MUL : 1) * dt + 0.15;
         const dx = nx - p.x, dz = nz - p.z, d = Math.hypot(dx, dz);
         if (d > maxStep) { nx = p.x + dx / d * maxStep; nz = p.z + dz / d * maxStep; }
       }
@@ -239,6 +240,7 @@
       this.updatePlayers();
       this.updateBullets(dt);
       this.updateStones(dt);
+      this.updateBombs();
       this.updatePickups();
     }
     beginFight() {
@@ -282,7 +284,7 @@
     }
     respawn(p) {
       const pt = this.spawnPoint(p), t = this.t;
-      p.x = pt.x; p.z = pt.z; p.vx = p.vz = 0; p.hp = C.HP; p.alive = true; p.respawnAt = 0;
+      p.x = pt.x; p.z = pt.z; p.vx = p.vz = 0; p.hp = p.hpMax = this.hpBase; p.alive = true; p.respawnAt = 0; p.speedUntil = 0;
       p.aim = Math.atan2(-pt.x, -pt.z);                      // quay về giữa sân
       p.ammo = C.RIFLE.mag; p.reloadUntil = 0; p.nextRifle = t + 0.3; p.nextSnipe = t + 0.3;
       p.power = 0; p.powerUntil = 0; p.freezeUntil = 0; p.fire = false;
@@ -349,11 +351,11 @@
       q.alive = false; q.fire = false; q.deaths++; q.vx = q.vz = 0;
       if (by && by.team && by.team !== q.team) by.kills = (by.kills || 0) + 1;
       this.lives[q.team] = Math.max(0, this.lives[q.team] - 1);
-      q.power = 0; q.powerUntil = 0; q.freezeUntil = 0;
+      q.power = 0; q.powerUntil = 0; q.freezeUntil = 0; q.speedUntil = 0;
       q.respawnAt = this.t + C.RESPAWN_DELAY;
       this.emit({ t: 'dead', id: q.id, by: by.id, lives: Object.assign({}, this.lives), respawn: this.lives[q.team] > 0 });
       if (this.lives[q.team] <= 0) {
-        this.phase = 'ending'; this.winner = other(q.team); this.endAt = this.t + C.END_DELAY; this.bullets = []; this.stones = [];
+        this.phase = 'ending'; this.winner = other(q.team); this.endAt = this.t + C.END_DELAY; this.bullets = []; this.stones = []; this.bombs = [];
         this.emit({ t: 'match_end', winner: this.winner, lives: Object.assign({}, this.lives) });
       }
     }
@@ -434,20 +436,61 @@
     }
     applyPickup(p, pk) {
       const t = this.t, ev = { t: 'pickup_take', id: pk.id, by: p.id, type: pk.type, x: pk.x, z: pk.z };
-      if (pk.type === 'heal') p.hp = Math.min(C.HP, p.hp + C.HEAL);
+      if (pk.type === 'heal') {
+        // hồi máu; phần thừa khi đã đầy được cộng vào máu gốc (tối đa) của người chơi, giữ nguyên tới khi mất mạng
+        const room = p.hpMax - p.hp, bonus = Math.max(0, C.HEAL - room);
+        p.hpMax += bonus; p.hp = Math.min(p.hpMax, p.hp + C.HEAL);
+        ev.bonus = bonus;
+      }
+      else if (pk.type === 'bomb') this.throwBombs(p);
+      else if (pk.type === 'boots') { p.speedUntil = t + C.BOOST_TIME; ev.speedTime = C.BOOST_TIME; }
       else if (pk.type === 'power') { p.power = 1; p.powerUntil = t + C.POWER_TIME; }   // không cộng dồn: nhặt thêm chỉ làm mới 2s
       else if (pk.type === 'shield') p.shieldUntil = Math.max(p.shieldUntil, t + C.SHIELD);
       else if (pk.type === 'freeze') {
         ev.frozen = [];
         for (const q of this.players) if (q.alive && q.team !== p.team) { q.freezeUntil = t + C.FREEZE; q.vx = q.vz = 0; ev.frozen.push(q.id); }
       }
-      ev.hp = p.hp; ev.power = p.power; ev.powerTime = C.POWER_TIME;
+      ev.hp = p.hp; ev.hpMax = p.hpMax; ev.power = p.power; ev.powerTime = C.POWER_TIME;
       this.emit(ev);
+    }
+
+    /** Bom ném: tự ném BOMB.count quả vào vị trí gần địch (lệch ngẫu nhiên ≤ spread). Địch chạy khỏi vùng nổ trong lúc bom rơi là né được. */
+    throwBombs(p) {
+      const B = C.BOMB;
+      let foes = this.players.filter((q) => q.team !== p.team && q.alive);
+      if (!foes.length) foes = this.players.filter((q) => q.team !== p.team);
+      if (!foes.length) return;
+      for (let i = 0; i < B.count; i++) {
+        const f = foes[i % foes.length], a = this.rng() * Math.PI * 2, d = this.rng() * B.spread;
+        const x = clamp(f.x + Math.sin(a) * d, -(this.map.HW - 0.3), this.map.HW - 0.3);
+        const z = clamp(f.z + Math.cos(a) * d, -(this.map.HD - 0.3), this.map.HD - 0.3);
+        const fall = Math.max(0.3, B.fall - (B.count - 1 - i) * B.stagger);   // quả cuối rơi đúng ~1s, quả đầu sớm hơn
+        const b = { id: ++this.bid, owner: p.id, team: p.team, x, z, land: this.t + fall, fall };
+        this.bombs.push(b);
+        this.emit({ t: 'bomb_throw', id: b.id, owner: p.id, fx: +p.x.toFixed(3), fz: +p.z.toFixed(3), x: +x.toFixed(3), z: +z.toFixed(3), fall });
+      }
+    }
+    updateBombs() {
+      const B = C.BOMB;
+      for (let i = 0; i < this.bombs.length; i++) {
+        const b = this.bombs[i];
+        if (this.t < b.land) continue;
+        this.bombs.splice(i, 1); i--;
+        this.emit({ t: 'bomb_boom', id: b.id, x: b.x, z: b.z, r: B.radius });
+        const owner = this.player(b.owner) || { id: b.owner, team: b.team };
+        for (const q of this.players) {
+          if (!q.alive || q.team === b.team) continue;
+          if (Math.hypot(q.x - b.x, q.z - b.z) <= B.radius) {
+            this.damage(q, owner, B.dmg, 'bomb');
+            if (this.phase !== 'fight') return;
+          }
+        }
+      }
     }
 
     pause() {
       if (this.phase === 'over') return;
-      this.phase = 'paused'; this.bullets = []; this.stones = []; this.pickups = [];
+      this.phase = 'paused'; this.bullets = []; this.stones = []; this.bombs = []; this.pickups = [];
       this.emit({ t: 'paused' });
     }
     /** Kết nối lại sau khi bị tạm dừng: ván đấu tiếp tục (mạng đã mất vẫn giữ nguyên) */
@@ -464,14 +507,14 @@
     }
     forfeit(team) {
       if (this.phase === 'over') return;
-      this.phase = 'over'; this.winner = other(team); this.bullets = []; this.stones = [];
+      this.phase = 'over'; this.winner = other(team); this.bullets = []; this.stones = []; this.bombs = [];
       this.emit({ t: 'over', winner: this.winner, lives: Object.assign({}, this.lives), reason: 'forfeit' });
     }
 
     pstate(p) {
       const t = this.t;
       return { id: p.id, team: p.team, x: +p.x.toFixed(3), z: +p.z.toFixed(3), vx: +p.vx.toFixed(2), vz: +p.vz.toFixed(2), aim: +p.aim.toFixed(3),
-        hp: p.hp, al: p.alive, w: p.weapon, am: p.ammo, rl: Math.max(0, +(p.reloadUntil - t).toFixed(2)),
+        hp: p.hp, hm: p.hpMax, al: p.alive, w: p.weapon, sp: Math.max(0, +(p.speedUntil - t).toFixed(2)), am: p.ammo, rl: Math.max(0, +(p.reloadUntil - t).toFixed(2)),
         sn: Math.max(0, +(p.nextSnipe - t).toFixed(2)), sh: Math.max(0, +(p.shieldUntil - t).toFixed(2)),
         fr: Math.max(0, +(p.freezeUntil - t).toFixed(2)), pw: p.power, pwt: p.power > 0 ? Math.max(0, +(p.powerUntil - t).toFixed(2)) : 0, rs: p.alive ? 0 : Math.max(0, +(p.respawnAt - t).toFixed(2)) };
     }
@@ -480,7 +523,7 @@
     /** Ảnh chụp đầy đủ (cho người vào xem / kết nối lại) */
     snapshot() {
       return Object.assign(this.state(), {
-        livesMax: this.livesMax, sel: Math.max(0, +(this.selectEnd - this.t).toFixed(2)),
+        livesMax: this.livesMax, hpBase: this.hpBase, bombs: this.bombs.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, fall: b.fall, left: Math.max(0, +(b.land - this.t).toFixed(2)) })), sel: Math.max(0, +(this.selectEnd - this.t).toFixed(2)),
         pickups: this.pickups.map((q) => ({ id: q.id, type: q.type, x: q.x, z: q.z, life: Math.max(0, +(q.until - this.t).toFixed(1)) })),
         bullets: this.bullets.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, bounces: b.bounces })),
         broken: this.map.obstacles.map((o, i) => o.broken ? { i, w: o.w, d: o.d, r: o.r, gone: !!o.gone } : null).filter(Boolean),

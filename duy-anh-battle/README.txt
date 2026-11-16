@@ -17,15 +17,18 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
      Mỗi lần bị hạ mất 1 mạng. Hết mạng trước thì thua.
    - Còn mạng thì hồi sinh sau 1,5 giây ở một vị trí ngẫu nhiên (ưu tiên xa đối thủ).
      Đầu ván và mỗi lần hồi sinh đều BẤT TỬ 2 giây.
-   - Mỗi lần xuất hiện có 100 máu.
+   - Máu mỗi trận: nhập ở ô "Máu mỗi trận" (menu Trận đấu / cài đặt phòng online), từ 100 đến 1000; để trống = 100.
+     Mỗi lần xuất hiện (đầu ván và mỗi lần hồi sinh) có đúng số máu đó.
    - Súng nước: 1 viên / 0,3s, băng 10 viên rồi thay đạn 0,5s. 10 máu / viên. Không xuyên vật cản. Đạn va chạm 3 lần: 2 lần đầu nảy,
      lần thứ 3 đạn vỡ; nếu lần đó đập vào vật cản thì tính 1 nhát phá. Hai lần nảy đầu vào vật cản cũng sứt nửa nhát (C.BREAK.chip). Vật cản bé cần 3 nhát, to cần 5 nhát (theo diện tích) mới
      biến mất, trước đó thu nhỏ dần. Tường bao không bị phá.
    - Ná cao su: 1 phát / 1,5s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 32 m/s (né được, cần ngắm đón đầu),
      xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Tầm bay tối đa 40m.
    - Cứ 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân (tối đa 8 cái, biến mất sau 16s):
-       ❤️ Hồi 10 máu   💪 +10 sát thương mỗi phát trong 2s (không cộng dồn, nhặt thêm chỉ tính lại 2s)
+       ❤️ Hồi 10 máu (nếu máu đã đầy, phần dư được cộng vào máu gốc tối đa, giữ nguyên tới khi mất mạng)   💪 +10 sát thương mỗi phát trong 2s (không cộng dồn, nhặt thêm chỉ tính lại 2s)
        🛡️ Khiên 2s (miễn sát thương)   ❄️ Đóng băng đối phương 1s (không di chuyển được, vẫn ngắm và bắn được)
+       💣 Bom ném: nhặt là tự ném 2 quả xuống chỗ gần địch, mỗi quả 20 máu, rơi trong ≤1s (vùng nổ bán kính 1,2 m, chạy ra là né được)
+       👟 Giày: chạy nhanh gấp 1,5 lần trong 3 giây
    - Đạn không gây sát thương cho đồng đội (và cho chính mình).
 
 4) ĐIỀU KHIỂN
@@ -45,7 +48,7 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
    Tủ đồ VIP: kit áo, quần theo ảnh của bạn (chỉ hiển thị trên máy bạn).
 
 7) SỬA NHANH
-   Hằng số (máu, sát thương, thời gian chọn súng, bất tử, hồi sinh, vật phẩm...) và 6 bản đồ: assets/config.js
+   Hằng số (máu mặc định/min/max HP, HP_MIN, HP_MAX, bom C.BOMB, giày C.BOOST_MUL/BOOST_TIME, sát thương, thời gian chọn súng, bất tử, hồi sinh, vật phẩm...) và 6 bản đồ: assets/config.js
    Cân bằng súng: config.js > C.RIFLE (dmg, delay, mag, bounces...), C.BREAK (số nhát phá 3–5, mức thu nhỏ) và C.SNIPER (dmg, delay, speed, range).
    Bot: config.js (LEVELS) + assets/ai.js (bot ngắm đón đầu cho cả súng nước lẫn ná, và né cả đá ná). Lõi luật: assets/shooter.js (chạy cả trên trình duyệt lẫn server).
 

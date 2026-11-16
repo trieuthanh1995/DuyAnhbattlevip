@@ -6,11 +6,12 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const APP_VERSION = '1.1.0';
+  const APP_VERSION = '1.2.0';
   const GAME_NAME = 'Duy Anh Battle';
 
   const C = {
-    HP: 100,
+    HP: 100,                  // máu mặc định mỗi lần xuất hiện (người chơi có thể chọn 100–1000 trước trận)
+    HP_MIN: 100, HP_MAX: 1000,
     PLAYER_R: 0.42,           // bán kính va chạm của nhân vật
     SPEED: 4.6,               // m/s
     STEP: 1 / 60,             // bước mô phỏng cố định
@@ -28,6 +29,10 @@
     // (nội suy theo diện tích so với vật cản bé/to nhất của mọi bản đồ). Mỗi nhát thu nhỏ dần, nhát cuối thì biến mất. minScale = cỡ còn lại ngay trước nhát cuối.
     // chip: mỗi lần đạn NẢY vào vật cản (lần va chạm 1, 2) cũng làm sứt nửa nhát, để súng nước phá nhanh hơn; lần thứ 3 vẫn tính trọn 1 nhát.
     BREAK: { hitsMin: 3, hitsMax: 5, minScale: 0.3, chip: 0.5 },
+    // 💣 Bom ném: nhặt là tự ném BOMB.count quả vào chỗ gần địch, rơi sau tối đa BOMB.fall giây (địch chạy ra khỏi vùng nổ là né được)
+    BOMB: { count: 2, dmg: 20, fall: 1.0, stagger: 0.3, spread: 0.8, radius: 1.2 },
+    // 👟 Giày: chạy nhanh BOOST_MUL lần trong BOOST_TIME giây
+    BOOST_MUL: 1.5, BOOST_TIME: 3,
     POWER_BONUS: 10,          // vật phẩm sức mạnh: +10 sát thương mỗi phát (cộng dồn)
     HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
     POWER_TIME: 2,            // vật phẩm sức mạnh: +10 sát thương trong 2 giây, KHÔNG cộng dồn (nhặt thêm chỉ làm mới lại 2s)
@@ -35,7 +40,14 @@
     HW: 13, HD: 8,            // nửa chiều dài / nửa chiều rộng sân (m) – sân 26×16, rộng gấp đôi DIỆN TÍCH bản cũ (18×11)
     CHAR_SCALE: 1.3,          // hệ số phóng to nhân vật khi hiển thị
   };
-  const PICKUP_TYPES = ['heal', 'power', 'shield', 'freeze'];
+  const PICKUP_TYPES = ['heal', 'power', 'shield', 'freeze', 'bomb', 'boots'];
+  /** Máu mỗi trận: để trống / không hợp lệ → 100; còn lại giới hạn trong 100–1000 */
+  function normHp(v) {
+    if (v === '' || v === null || v === undefined) return C.HP;
+    const n = Math.round(Number(v));
+    if (!Number.isFinite(n)) return C.HP;
+    return Math.max(C.HP_MIN, Math.min(C.HP_MAX, n));
+  }
 
   /* ---------- bản đồ: obstacles là 1 góc phần tư (x>0,z>0), tự lấy đối xứng 4 góc ---------- */
   const box = (x, z, w, d) => ({ t: 'box', x, z, w, d });
@@ -139,5 +151,5 @@
     numberMax: 99,
   };
 
-  return { GAME_NAME, APP_VERSION, C, OBS_AREA, obsArea, PICKUP_TYPES, MAPS, VENUES, CHARACTERS, LEVELS, LOOK };
+  return { GAME_NAME, APP_VERSION, normHp, C, OBS_AREA, obsArea, PICKUP_TYPES, MAPS, VENUES, CHARACTERS, LEVELS, LOOK };
 });

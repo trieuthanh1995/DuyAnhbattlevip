@@ -34,7 +34,8 @@
     }
     return true;
   };
-  const settingsOk = (s) => isObj(s) && VENUE_IDS.includes(s.venue) && LIVES.includes(s.lives);
+  const settingsOk = (s) => isObj(s) && VENUE_IDS.includes(s.venue) && LIVES.includes(s.lives) &&
+    (s.hp === undefined || isInt(s.hp, cfg.C.HP_MIN, cfg.C.HP_MAX));
 
   const V = {
     hello: (m) => isStr(m.deviceId, 64, 8) && isStr(m.name, 40, 1) && CHAR_IDS.includes(m.char) && isInt(m.version, 0, 1e6) && lookOk(m.look) && (m.weapon === undefined || WEAPONS.includes(m.weapon)),

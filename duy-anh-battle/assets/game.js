@@ -14,13 +14,14 @@
   /* ================= Lưu trữ ================= */
   const DEFAULT_SETTINGS = { quality: 'auto', volume: 80, music: true, sfx: true, musicVol: 50, aimline: true, shake: true, voiceVol: 200, voiceMic: 180 };
   const Save = {
-    data: { wins: 0, losses: 0, char: 'bunny', level: 'pro', venue: 'candy', lives: 5, weapon: 'rifle', mode: 1, muted: false, name: '', deviceId: '', settings: {}, looks: {} },
+    data: { wins: 0, losses: 0, char: 'bunny', level: 'pro', venue: 'candy', lives: 5, hp: 0, weapon: 'rifle', mode: 1, muted: false, name: '', deviceId: '', settings: {}, looks: {} },
     load() {
       try { Object.assign(this.data, JSON.parse(localStorage.getItem('bb-save') || '{}')); } catch (e) { /* localStorage bị chặn */ }
       this.data.settings = Object.assign({}, DEFAULT_SETTINGS, this.data.settings || {});
       if (!this.data.looks || typeof this.data.looks !== 'object') this.data.looks = {};
       if (!C.LIVES.includes(+this.data.lives)) this.data.lives = 5;
       if (this.data.weapon !== 'sniper') this.data.weapon = 'rifle';
+      this.data.hp = +this.data.hp > 0 ? PP.normHp(this.data.hp) : 0;      // 0 = để trống → 100 máu
       if (!this.data.deviceId) {
         this.data.deviceId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'd' + Math.random().toString(16).slice(2) + Date.now().toString(16);
         this.save();
@@ -62,7 +63,7 @@
   }
 
   /* ================= Three.js ================= */
-  let renderer, world = null, clock, bullets, stones, pickups, fx, aimDots = [];
+  let renderer, world = null, clock, bullets, stones, bombs, pickups, fx, aimDots = [];
   const _v = new THREE.Vector3();
   let shake = 0, time = 0;
 
@@ -75,7 +76,7 @@
   const V = {};
   const ctl = { aim: 0, fire: false, sendT: 0, menuT: 0, selShown: -1, emptyT: 0 };
   function resetView(cfg) {
-    Object.assign(V, { phase: 'idle', lives: { A: 5, B: 5 }, livesMax: 5, teamSize: 1, venue: 'candy', selEnd: 0, over: false }, cfg || {});
+    Object.assign(V, { phase: 'idle', hpBase: C.HP, lives: { A: 5, B: 5 }, livesMax: 5, teamSize: 1, venue: 'candy', selEnd: 0, over: false }, cfg || {});
     ctl.sendT = 0; ctl.selShown = -1;
   }
   resetView();
@@ -113,16 +114,16 @@
     for (const p of players.values()) { try { p.ch.dispose(); } catch (e) { /* bỏ qua */ } if (p.holder && p.holder.parent) p.holder.parent.remove(p.holder); }
     players.clear();
     if (bullets) bullets.clear();
-    if (stones) stones.clear();
+    if (stones) stones.clear(); if (bombs) bombs.clear();
     if (world) { try { world.dispose(); } catch (e) { /* bỏ qua */ } }
-    world = null; bullets = stones = pickups = fx = null; aimDots = [];
+    world = null; bullets = stones = bombs = pickups = fx = null; aimDots = [];
     $('#tags').textContent = ''; $('#floaters').textContent = '';
   }
 
   function buildScene(mapId, list, tags) {
     disposeWorld();
     world = Arena.build(renderer, mapId, quality());
-    bullets = new Arena.Bullets(world); stones = new Arena.Stones(world); pickups = new Arena.Pickups(world); fx = new Arena.Fx(world);
+    bullets = new Arena.Bullets(world); stones = new Arena.Stones(world); bombs = new Arena.Bombs(world); pickups = new Arena.Pickups(world); fx = new Arena.Fx(world);
     const dotGeo = new THREE.CircleGeometry(0.07, 8), dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
     for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(dotGeo, dotMat.clone()); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.visible = false; world.stage.add(m); aimDots.push(m); }
     for (const p of list) {
@@ -133,7 +134,7 @@
       const weapon = p.weapon === 'sniper' ? 'sniper' : 'rifle';
       const gun = PP.Guns.attach(ch, weapon, PP.Guns.colorFrom(def, look));     // cầm súng, không cầm vợt
             const shield = Arena.makeShield(), ice = Arena.makeIce(); shield.visible = ice.visible = false; holder.add(shield, ice);
-      const obj = Object.assign({ x: 0, z: 0, vx: 0, vz: 0, aim: p.team === 'A' ? Math.PI / 2 : -Math.PI / 2, yaw: 0, hp: C.HP, alive: true, am: C.RIFLE.mag, rl: 0, sn: 0, sh: 0, fr: 0, pw: 0, pwt: 0, rs: 0,
+      const obj = Object.assign({ x: 0, z: 0, vx: 0, vz: 0, aim: p.team === 'A' ? Math.PI / 2 : -Math.PI / 2, yaw: 0, hp: V.hpBase, hpMax: V.hpBase, spd: 0, alive: true, am: C.RIFLE.mag, rl: 0, sn: 0, sh: 0, fr: 0, pw: 0, pwt: 0, rs: 0,
         buf: [], tag: null, deadT: 0, kick: 0, celebrate: false }, p, { w: weapon, ch, holder, gun, shield, ice });
       obj.yaw = obj.aim;
       if (tags) {
@@ -180,8 +181,10 @@
   function applyEvent(e) {
     switch (e.t) {
       case 'select_start': {
-        V.phase = 'select'; V.livesMax = e.lives; V.lives = { A: e.lives, B: e.lives }; V.selEnd = e.ts + e.select; ctl.selShown = -1; V.over = false;
-        if (bullets) bullets.clear(); if (stones) stones.clear(); if (pickups) pickups.clear();
+        V.phase = 'select'; V.livesMax = e.lives; V.lives = { A: e.lives, B: e.lives };
+        if (e.hp) V.hpBase = e.hp;
+        for (const q of players.values()) { q.hp = q.hpMax = V.hpBase; q.spd = 0; } V.selEnd = e.ts + e.select; ctl.selShown = -1; V.over = false;
+        if (bullets) bullets.clear(); if (stones) stones.clear(); if (bombs) bombs.clear(); if (pickups) pickups.clear();
         for (const pos of e.positions) { const p = players.get(pos.id); if (p) { p.x = pos.x; p.z = pos.z; p.aim = pos.aim; p.yaw = pos.aim; } }
         if (me) ctl.aim = me.aim;
         UI.hideScreens(); UI.banner(null); UI.setMsg('');
@@ -237,7 +240,7 @@
       case 'dead': {
         const q = players.get(e.id); if (!q) break;
         V.lives = e.lives;
-        q.alive = false; q.hp = 0; q.deadT = 0.0001; q.pw = 0; q.pwt = 0; q.fr = 0; q.sh = 0;
+        q.alive = false; q.hp = 0; q.deadT = 0.0001; q.pw = 0; q.pwt = 0; q.fr = 0; q.sh = 0; q.spd = 0;
         fx.burst(q.x, q.z, 0xffffff, 22, 4, 0.7, 0.13); fx.ring(q.x, q.z, 0xff6b8a, 2.8);
         floater(q.x, q.z, '-1 ♥', 'dmg', 2.2);
         if (q.tag) q.tag.classList.add('dead');
@@ -248,7 +251,7 @@
       }
       case 'respawn': {
         const q = players.get(e.id); if (!q) break;
-        Object.assign(q, { alive: true, hp: C.HP, x: e.x, z: e.z, aim: e.aim, yaw: e.aim, vx: 0, vz: 0, sh: e.shield, fr: 0, pw: 0, pwt: 0, am: C.RIFLE.mag, rl: 0, sn: 0, deadT: 0, rs: 0 });
+        Object.assign(q, { alive: true, hp: V.hpBase, hpMax: V.hpBase, spd: 0, x: e.x, z: e.z, aim: e.aim, yaw: e.aim, vx: 0, vz: 0, sh: e.shield, fr: 0, pw: 0, pwt: 0, am: C.RIFLE.mag, rl: 0, sn: 0, deadT: 0, rs: 0 });
         q.buf.length = 0; q.holder.visible = true;
         if (q.tag) q.tag.classList.remove('dead');
         fx.burst(e.x, e.z, 0x7fdcff, 16, 3.2, 0.8, 0.1); fx.ring(e.x, e.z, 0x6fdcff, 2.4);
@@ -274,6 +277,14 @@
         } else fx.burst(e.x, e.z, col, 4, 2, 0.6, 0.08);   // sứt nhẹ khi nảy: hiệu ứng nhỏ, không kêu
         break;
       }
+      case 'bomb_throw': if (bombs) bombs.add(e); break;
+      case 'bomb_boom': {
+        if (bombs) bombs.remove(e.id);
+        if (fx) { fx.burst(e.x, e.z, 0xff9a3c, 22, 4.2, 0.6, 0.14); fx.burst(e.x, e.z, 0x444455, 10, 2.6, 0.5, 0.1); fx.ring(e.x, e.z, 0xff5a3c, e.r * 2.2); }
+        A.boom();
+        if (me && S().shake && Math.hypot(me.x - e.x, me.z - e.z) < 4) shake = Math.max(shake, 0.5);
+        break;
+      }
       case 'pickup_spawn': if (pickups) { pickups.add(e); A.spawnPing(); } break;
       case 'power_end': { const q = players.get(e.id); if (q) { q.pw = 0; q.pwt = 0; if (q.isMe) updateHUD(); } break; }
       case 'pickup_expire': if (pickups) pickups.remove(e.id); break;
@@ -282,7 +293,12 @@
         const p = players.get(e.by), info = Arena.PK[e.type];
         fx.burst(e.x, e.z, info.color, 14, 3.2, 0.8, 0.1); fx.ring(e.x, e.z, info.color, 2);
         if (p) {
-          if (e.type === 'heal') { p.hp = e.hp; floater(p.x, p.z, '+' + C.HEAL, 'heal'); }
+          if (e.type === 'heal') {
+            p.hp = e.hp; if (e.hpMax) p.hpMax = e.hpMax;
+            floater(p.x, p.z, e.bonus > 0 ? '❤️ +' + C.HEAL + ' · máu gốc +' + e.bonus : '+' + C.HEAL, 'heal');
+          }
+          else if (e.type === 'bomb') floater(p.x, p.z, '💣 Ném ' + C.BOMB.count + ' bom!', 'heal');
+          else if (e.type === 'boots') { p.spd = e.speedTime || C.BOOST_TIME; floater(p.x, p.z, '👟 Chạy nhanh ×' + C.BOOST_MUL + ' ' + C.BOOST_TIME + 's', 'heal'); }
           else if (e.type === 'power') { p.pw = e.power; p.pwt = e.powerTime || C.POWER_TIME; floater(p.x, p.z, '💪 +' + C.POWER_BONUS + ' sát thương ' + C.POWER_TIME + 's', 'heal'); }
           else if (e.type === 'shield') { p.sh = C.SHIELD; floater(p.x, p.z, '🛡️ Khiên ' + C.SHIELD + 's', 'shield'); }
           else if (e.type === 'freeze') {
@@ -297,7 +313,7 @@
       case 'match_end': {
         V.phase = 'ending'; V.lives = e.lives;
         if (bullets) bullets.clear();
-        if (stones) stones.clear();
+        if (stones) stones.clear(); if (bombs) bombs.clear();
         for (const p of players.values()) p.celebrate = p.team === e.winner && p.alive;
         if (mode === 'spectate') UI.call(teamName(e.winner) + ' thắng!', '', 'good');
         else if (e.winner === myTeam) UI.call('CHIẾN THẮNG!', 'Đối thủ hết mạng', 'good');
@@ -354,7 +370,7 @@
       } else if (cfg.opponent) list.push(bot('b1', 'B', cfg.opponent.char, cfg.opponent.name, cfg.level));
       else list.push(bot('b1', 'B', pool[0], CHAR(pool[0]).name, cfg.level));
       this.list = list;
-      this.sim = new Shooter.Sim({ map: cfg.venue, teamSize: cfg.teamSize, lives: cfg.lives, seed: (Math.random() * 1e9) | 0, players: list.map((p) => ({ id: p.id, team: p.team, weapon: p.weapon })) });
+      this.sim = new Shooter.Sim({ map: cfg.venue, teamSize: cfg.teamSize, lives: cfg.lives, hp: cfg.hp, seed: (Math.random() * 1e9) | 0, players: list.map((p) => ({ id: p.id, team: p.team, weapon: p.weapon })) });
       this.bots = list.filter((p) => p.isBot).map((p, i) => new PP.BotBrain(this.sim, p.id, p.team === 'A' ? 'pro' : cfg.level, Shooter.mulberry32(((Math.random() * 1e9) | 0) + i)));
     }
     now() { return this.t; }
@@ -369,7 +385,7 @@
       this.flush();
       for (const sp of sim.players) {
         const v = players.get(sp.id); if (!v) continue;
-        v.hp = sp.hp; v.alive = sp.alive; v.am = sp.ammo; v.pw = sp.power; v.pwt = sp.power > 0 ? Math.max(0, sp.powerUntil - sim.t) : 0;
+        v.hp = sp.hp; v.hpMax = sp.hpMax; v.spd = Math.max(0, sp.speedUntil - sim.t); v.alive = sp.alive; v.am = sp.ammo; v.pw = sp.power; v.pwt = sp.power > 0 ? Math.max(0, sp.powerUntil - sim.t) : 0;
         v.rl = sp.reloadUntil ? Math.max(0, sp.reloadUntil - sim.t) : 0; v.sn = Math.max(0, sp.nextSnipe - sim.t);
         v.sh = Math.max(0, sp.shieldUntil - sim.t); v.fr = Math.max(0, sp.freezeUntil - sim.t);
         v.rs = sp.alive ? 0 : Math.max(0, sp.respawnAt - sim.t);
@@ -422,7 +438,7 @@
     }
     if (canMove) {
       const d = world.dirFromScreen(inp.mx, inp.my);
-      Shooter.stepMove(world.map, me, d.x, d.z, dt, 1);
+      Shooter.stepMove(world.map, me, d.x, d.z, dt, me.spd > 0 ? C.BOOST_MUL : 1);   // 👟 giày: chạy nhanh hơn
     } else { me.vx = me.vz = 0; }
     ctl.fire = !!(inp.fire && canShoot);
     // tiếng "hết đạn"
@@ -475,8 +491,9 @@
         const pt = world.project(p.x, 1.55 * CS, p.z);
         p.tag.style.display = pt.vis && p.holder.visible ? '' : 'none';
         p.tag.style.left = pt.x + 'px'; p.tag.style.top = pt.y + 'px';
-        p.tagBar.style.width = Math.max(0, p.hp) + '%';
-        p.tagBar.style.background = p.hp <= 30 ? '#ff6b6b' : '#7cff6b';
+        const hr = Math.max(0, Math.min(1, p.hp / (p.hpMax || V.hpBase)));
+        p.tagBar.style.width = (hr * 100) + '%';
+        p.tagBar.style.background = hr <= 0.3 ? '#ff6b6b' : '#7cff6b';
       }
     }
   }
@@ -488,7 +505,7 @@
   const miniEl = $('#minimap'), arrowBox = $('#offarrows'), hudEl = $('#hud');
   const miniState = { base: null, key: '', w: 0, h: 0, dpr: 1 };
   const arrowEls = new Map();
-  const PK_COL = { heal: '#4cd964', power: '#ff9f1c', shield: '#38c8ff', freeze: '#9ee6ff' };
+  const PK_COL = { heal: '#4cd964', power: '#ff9f1c', shield: '#38c8ff', freeze: '#9ee6ff', bomb: '#555a75', boots: '#5ee07a' };
   const hexCol = (n) => typeof n === 'number' ? '#' + n.toString(16).padStart(6, '0') : n;
   /** toạ độ sân (sim) → (u sang phải, v lên trên) theo chiều camera */
   function toUV(x, z) {
@@ -597,6 +614,7 @@
     if (mode === 'menu') menuTick(dt);
     updatePlayers(dt);
     if (pickups) pickups.update(dt, time);
+    if (bombs) bombs.update(dt, time);
     if (fx) fx.update(dt);
     updateAimLine();
     // camera 3D kiểu Pickle Ball: sau vạch cuối sân của mình, bám theo nhân vật
@@ -635,12 +653,13 @@
   /* ================= HUD ================= */
   let hudCache = '';
   function sumHp(t) { let s = 0; for (const p of players.values()) if (p.team === t) s += Math.max(0, p.hp); return s; }
+  function sumMax(t) { let s = 0; for (const p of players.values()) if (p.team === t) s += (p.hpMax || V.hpBase); return s; }
   function updateHUD(light) {
-    const L = mode === 'spectate' ? 'A' : myTeam, R = other(L), max = C.HP * V.teamSize;
+    const L = mode === 'spectate' ? 'A' : myTeam, R = other(L);
     const setHp = (side, team) => {
-      const s = sumHp(team); const bar = $('#hud-' + side + '-hp');
+      const s = sumHp(team), max = Math.max(1, sumMax(team)); const bar = $('#hud-' + side + '-hp');
       bar.style.width = (s / max * 100) + '%'; bar.parentElement.classList.toggle('low', s / max <= 0.3);
-      $('#hud-' + side + '-hpt').textContent = s + (V.teamSize === 2 ? '/' + max : '');
+      $('#hud-' + side + '-hpt').textContent = s + '/' + max;
     };
     setHp('l', L); setHp('r', R);
     $('#hud-l-score').textContent = '♥' + V.lives[L]; $('#hud-r-score').textContent = '♥' + V.lives[R];
@@ -653,7 +672,7 @@
       const setAva = (sel, p) => { const el = $(sel); el.textContent = ''; if (p) el.append(UI.avatarEl(p.char, 'em')); };
       setAva('#hud-l-ava', first(L)); setAva('#hud-r-ava', first(R));
     }
-    $('#hud-target').textContent = V.livesMax + ' mạng';
+    $('#hud-target').textContent = V.livesMax + ' mạng · ' + V.hpBase + ' máu';
     $('#hud-wind').textContent = V.teamSize === 2 ? 'Mạng chung của đội' : 'Hết mạng là thua';
   }
   function updateWeaponHud() {
@@ -673,9 +692,10 @@
     if (me.pw > 0) fxs.push('💪 +' + me.pw * C.POWER_BONUS + ' dmg ' + (me.pwt || 0).toFixed(1) + 's');
     if (me.sh > 0) fxs.push('🛡️ ' + me.sh.toFixed(1) + 's');
     if (me.fr > 0) fxs.push('❄️ ' + me.fr.toFixed(1) + 's');
+    if (me.spd > 0) fxs.push('👟 ×' + C.BOOST_MUL + ' ' + me.spd.toFixed(1) + 's');
     const s = fxs.join('|');
     const bar = $('#fxbar');
-    if (bar.dataset.k !== s || me.sh > 0 || me.fr > 0 || me.pw > 0) { bar.dataset.k = s; bar.textContent = ''; for (const f of fxs) { const sp = document.createElement('span'); sp.textContent = f; bar.append(sp); } }
+    if (bar.dataset.k !== s || me.sh > 0 || me.fr > 0 || me.pw > 0 || me.spd > 0) { bar.dataset.k = s; bar.textContent = ''; for (const f of fxs) { const sp = document.createElement('span'); sp.textContent = f; bar.append(sp); } }
   }
   /** Bảng chọn vũ khí 5 giây đầu ván */
   function showPick(on, left) {
@@ -728,10 +748,10 @@
     const d = Save.data;
     const teamSize = cupCfg ? 1 : (+d.mode === 2 ? 2 : 1);
     const lv = +d.lives === 22 && teamSize === 1 ? 11 : +d.lives;
-    const cfg = cupCfg || { teamSize, level: d.level, venue: d.venue, lives: lv };
+    const cfg = cupCfg || { teamSize, level: d.level, venue: d.venue, lives: lv, hp: PP.normHp(d.hp) };
     mode = 'offline';
     session = new OfflineSession(cfg);
-    resetView({ teamSize, venue: cfg.venue, livesMax: cfg.lives, lives: { A: cfg.lives, B: cfg.lives } });
+    resetView({ teamSize, venue: cfg.venue, hpBase: PP.normHp(cfg.hp), livesMax: cfg.lives, lives: { A: cfg.lives, B: cfg.lives } });
     myTeam = 'A';
     buildScene(cfg.venue, session.list, true);
     me = players.get('me');
@@ -1285,6 +1305,7 @@
       case 'match_start': startOnlineMatch(m); break;
       case 'sync': if (session) applySync(m.snapshot); break;
       case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'spop': case 'obs_break': case 'hit': case 'dead': case 'respawn': case 'bpop':
+      case 'bomb_throw': case 'bomb_boom': case 'power_end':
       case 'pickup_spawn': case 'pickup_take': case 'pickup_expire': case 'match_end': case 'over': case 'paused': case 'resumed':
         if (session && session.matchId === m.matchId) applyEvent(m);
         break;
@@ -1293,7 +1314,7 @@
         if (m.lives) V.lives = m.lives;
         for (const s of m.players) {
           const p = players.get(s.id); if (!p) continue;
-          p.hp = s.hp; p.alive = s.al; p.am = s.am; p.rl = s.rl; p.sn = s.sn; p.sh = s.sh; p.fr = s.fr; p.pw = s.pw; p.pwt = s.pwt || 0;
+          p.hp = s.hp; if (s.hm) p.hpMax = s.hm; p.spd = s.sp || 0; p.alive = s.al; p.am = s.am; p.rl = s.rl; p.sn = s.sn; p.sh = s.sh; p.fr = s.fr; p.pw = s.pw; p.pwt = s.pwt || 0;
           if (p.isMe) { if (Math.hypot(s.x - p.x, s.z - p.z) > 2.2) { p.x = s.x; p.z = s.z; } }   // server kéo lại khi lệch quá xa
           else { if (V.phase !== 'select') p.w = s.w; p.buf.push({ ts: m.ts, x: s.x, z: s.z, vx: s.vx, vz: s.vz, aim: s.aim }); if (p.buf.length > 24) p.buf.shift(); }
         }
@@ -1360,9 +1381,10 @@
     venueSel.value = room.settings.venue;
     $('#room-lives').value = String(room.settings.lives);
     const o22 = $('#room-lives').querySelector('option[value="22"]'); if (o22) { o22.hidden = o22.disabled = room.mode !== '2v2'; }
+    if (document.activeElement !== $('#room-hp')) $('#room-hp').value = room.settings.hp || C.HP;
     $('#room-fill').checked = !!room.fillBots;
     $('#room-botlevel').value = room.botLevel || 'pro';
-    for (const id of ['#room-venue', '#room-lives', '#room-fill', '#room-botlevel']) $(id).disabled = !isHost || room.quick;
+    for (const id of ['#room-venue', '#room-lives', '#room-hp', '#room-fill', '#room-botlevel']) $(id).disabled = !isHost || room.quick;
     $('#room-fill-wrap').classList.toggle('hidden', room.mode !== '2v2');
     $('#room-host-note').textContent = room.quick ? '(ghép nhanh)' : isHost ? '(bạn là chủ phòng)' : '(chủ phòng chỉnh)';
     const meP = room.players.find((p) => p.id === myPid);
@@ -1515,7 +1537,7 @@
     mode = spect ? 'spectate' : 'online';
     session = new OnlineSession(m);
     const st = m.settings;
-    resetView({ teamSize: st.teamSize, venue: st.venue, livesMax: st.lives, lives: { A: st.lives, B: st.lives } });
+    resetView({ teamSize: st.teamSize, venue: st.venue, hpBase: st.hp || C.HP, livesMax: st.lives, lives: { A: st.lives, B: st.lives } });
     myTeam = m.yourTeam || 'A';
     const list = m.players.map((p) => ({ id: p.id, team: p.team, char: p.char, name: p.name, isBot: p.isBot, isMe: p.id === myPid && !spect, look: p.look || {},
       weapon: p.id === myPid && !spect ? Save.data.weapon : 'rifle' }));
@@ -1531,15 +1553,16 @@
   }
 
   function applySync(s) {
-    V.phase = s.phase; V.lives = s.lives; V.livesMax = s.livesMax || V.livesMax; V.selEnd = s.ts + (s.sel || 0);
+    V.phase = s.phase; V.lives = s.lives; V.livesMax = s.livesMax || V.livesMax; if (s.hpBase) V.hpBase = s.hpBase; V.selEnd = s.ts + (s.sel || 0);
     for (const st of s.players) {
       const p = players.get(st.id); if (!p) continue;
-      Object.assign(p, { x: st.x, z: st.z, vx: st.vx, vz: st.vz, aim: st.aim, yaw: st.aim, hp: st.hp, alive: st.al, am: st.am, rl: st.rl, sn: st.sn, sh: st.sh, fr: st.fr, pw: st.pw, pwt: st.pwt || 0 });
+      Object.assign(p, { x: st.x, z: st.z, vx: st.vx, vz: st.vz, aim: st.aim, yaw: st.aim, hp: st.hp, hpMax: st.hm || V.hpBase, spd: st.sp || 0, alive: st.al, am: st.am, rl: st.rl, sn: st.sn, sh: st.sh, fr: st.fr, pw: st.pw, pwt: st.pwt || 0 });
       if (p.isMe ? s.phase !== 'select' : s.phase !== 'select') p.w = st.w;
       p.buf.length = 0;
       if (!p.alive) { p.holder.visible = p.rs > 0; if (p.tag) p.tag.classList.add('dead'); p.holder.visible = false; }
     }
     for (const pk of s.pickups) pickups.add(pk);
+    for (const b of (s.bombs || [])) bombs.add(b);
     for (const b of s.bullets) { const o = players.get(b.owner); bullets.spawn(b, o ? o.team : 'A', 0); }
     for (const o of (s.broken || [])) world.breakObstacle(o);
     miniState.key = '';
@@ -1627,7 +1650,7 @@
     UI.$$('[data-queue]').forEach((b) => b.onclick = () => { A.click(); net.send({ t: 'queue_join', mode: b.dataset.queue }); });
     UI.$$('[data-create]').forEach((b) => b.onclick = () => {
       A.click();
-      net.send({ t: 'room_create', mode: b.dataset.create, settings: { venue: Save.data.venue, lives: (b.dataset.create !== '2v2' && +Save.data.lives === 22) ? 11 : +Save.data.lives } });
+      net.send({ t: 'room_create', mode: b.dataset.create, settings: { venue: Save.data.venue, hp: PP.normHp(Save.data.hp), lives: (b.dataset.create !== '2v2' && +Save.data.lives === 22) ? 11 : +Save.data.lives } });
     });
     $('#btn-join').onclick = () => {
       const code = $('#join-code').value.trim().toUpperCase();
@@ -1652,8 +1675,9 @@
       else window.prompt('Sao chép link mời:', link);
     };
     UI.$$('[data-team]').forEach((b) => b.onclick = () => net.send({ t: 'room_update', team: b.dataset.team }));
-    const sendSettings = () => net.send({ t: 'room_update', settings: { venue: $('#room-venue').value, lives: +$('#room-lives').value } });
+    const sendSettings = () => net.send({ t: 'room_update', settings: { venue: $('#room-venue').value, lives: +$('#room-lives').value, hp: PP.normHp($('#room-hp').value) } });
     $('#room-venue').onchange = sendSettings; $('#room-lives').onchange = sendSettings;
+    $('#room-hp').onchange = () => { $('#room-hp').value = PP.normHp($('#room-hp').value); sendSettings(); };
     $('#room-fill').onchange = () => net.send({ t: 'room_update', fillBots: $('#room-fill').checked });
     $('#room-botlevel').onchange = () => net.send({ t: 'room_update', botLevel: $('#room-botlevel').value });
     $('#btn-ready').onclick = () => {
@@ -1709,7 +1733,7 @@
   }
   function setupSummary() {
     const d = Save.data, v = VENUE(d.venue);
-    const chips = [CHAR(d.char).name, +d.mode === 2 ? 'Đấu đôi' : 'Đấu đơn', PP.LEVELS[d.level].name, livesFor(d) + ' mạng', PP.Guns.NAMES[d.weapon], v.name];
+    const chips = [CHAR(d.char).name, +d.mode === 2 ? 'Đấu đôi' : 'Đấu đơn', PP.LEVELS[d.level].name, livesFor(d) + ' mạng', PP.normHp(d.hp) + ' máu', PP.Guns.NAMES[d.weapon], v.name];
     const el = $('#setup-summary'); el.textContent = '';
     for (const c of chips) { const s2 = document.createElement('span'); s2.className = 'chip'; s2.textContent = c; el.append(s2); }
     $('#setup-venue-info').textContent = v.desc;
@@ -1722,6 +1746,14 @@
     UI.seg($('#setup-level'), d.level, (v) => { d.level = v; Save.save(); setupSummary(); });
     UI.seg($('#setup-lives'), d.lives, (v) => { d.lives = +v; Save.save(); setupSummary(); });
     setupLivesSync();
+    const hpIn = $('#setup-hp');
+    hpIn.value = d.hp > 0 ? d.hp : '';
+    hpIn.oninput = () => { d.hp = hpIn.value === '' ? 0 : Math.max(0, Math.round(+hpIn.value) || 0); Save.save(); setupSummary(); };
+    hpIn.onchange = () => {       // chốt giá trị: để trống = 100; còn lại giới hạn 100–1000
+      if (hpIn.value === '' || !(+hpIn.value > 0)) { d.hp = 0; hpIn.value = ''; }
+      else { d.hp = PP.normHp(hpIn.value); hpIn.value = d.hp; }
+      Save.save(); setupSummary();
+    };
     UI.venueList($('#setup-venue'), d.venue, (v) => { d.venue = v; Save.save(); setupSummary(); });
     UI.show('scr-setup');
     if (!setupPreview && !softwareGL && PP.Character.createPreview) {

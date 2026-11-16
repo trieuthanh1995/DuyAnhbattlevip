@@ -312,9 +312,12 @@
   function pickup(type) {
     if (type === 'heal') [660, 880, 1100].forEach((f, i) => tone(f, 0.12, 'sine', 0.1, null, i * 0.07));
     else if (type === 'power') [330, 440, 660].forEach((f, i) => tone(f, 0.12, 'sawtooth', 0.06, f * 1.2, i * 0.06));
+    else if (type === 'bomb') { tone(180, 0.12, 'square', 0.08, 120); tone(260, 0.1, 'square', 0.06, 200, 0.1); }
+    else if (type === 'boots') [500, 700, 950, 1250].forEach((f, i) => tone(f, 0.07, 'triangle', 0.08, f * 1.3, i * 0.04));
     else if (type === 'shield') { tone(800, 0.3, 'triangle', 0.1, 1600); tone(1200, 0.25, 'sine', 0.05, 2000, 0.08); }
     else { [1400, 1100, 900, 700].forEach((f, i) => tone(f, 0.1, 'triangle', 0.07, f * 0.8, i * 0.05)); noise(0.3, 0.05, 6000, 'highpass', { delay: 0.05 }); }
   }
+  function boom() { tone(120, 0.35, 'sawtooth', 0.14, 40); noise(0.35, 0.16, 900, 'lowpass'); }
   function spawnPing() { tone(1568, 0.08, 'sine', 0.04); }
   function beep(final) { tone(final ? 1046 : 660, final ? 0.3 : 0.12, 'triangle', 0.13); }
   function dead() { [440, 349, 262, 196].forEach((f, i) => tone(f, 0.2, 'triangle', 0.11, f * 0.9, i * 0.09)); }
@@ -345,7 +348,7 @@
       const p = typeof c === 'number' ? c : (KIND_POWER[a] !== undefined ? KIND_POWER[a] : 0.8);
       paddle(a, b || 'good', p);
     },
-    gunShot, snipeShot, bubblePop, bubbleBounce, hurt, shieldBlock, reloadClick, empty, pickup, spawnPing, beep, dead,
+    gunShot, snipeShot, bubblePop, bubbleBounce, hurt, shieldBlock, reloadClick, empty, pickup, boom, spawnPing, beep, dead,
     perfect: sparkle,
     bounce,
     net: netSound,
