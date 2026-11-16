@@ -126,6 +126,16 @@
     const scene = new T.Scene();
     scene.background = lin(map.sky); scene.fog = new T.Fog(lin(map.sky), 70, 240);
     const env = envFor(renderer); if (env) { scene.environment = env; }
+    // ảnh nền toàn cảnh của từng bản đồ: vòng cung lớn quanh sân (ảnh lật gương 4 lần nên liền mạch 360°)
+    try {
+      const bgTex = new T.TextureLoader().load('assets/maps/bg_' + map.id + '.jpg');
+      bgTex.encoding = T.sRGBEncoding; bgTex.wrapS = T.MirroredRepeatWrapping; bgTex.repeat.set(4, 1);
+      bgTex.anisotropy = 4; bgTex.generateMipmaps = true; bgTex.minFilter = T.LinearMipmapLinearFilter;
+      const bgMesh = new T.Mesh(new T.CylinderGeometry(160, 160, 100, 64, 1, true),
+        new T.MeshBasicMaterial({ map: bgTex, side: T.BackSide, fog: false, toneMapped: false, depthWrite: false }));
+      bgMesh.position.y = 49.9; bgMesh.renderOrder = -1; bgMesh.frustumCulled = false;
+      scene.add(bgMesh);
+    } catch (e) { /* không tải được ảnh nền thì vẫn dùng màu trời */ }
     const camera = new T.PerspectiveCamera(38, 1, 0.5, 300);
     const hemi = new T.HemisphereLight(lin(0xffffff), lin(th.floor2), 0.5); scene.add(hemi);
     const sun = new T.DirectionalLight(lin(0xfff3e0), 0.95);

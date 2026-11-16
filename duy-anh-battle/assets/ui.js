@@ -68,6 +68,7 @@
       const sw = document.createElement('span'); sw.className = 'sw';
       const th = PP.VenueThumbs && PP.VenueThumbs.get(v.id);
       if (th) sw.style.backgroundImage = `url(${th})`;
+      else if (v.id) sw.style.backgroundImage = `url(assets/maps/bg_${v.id}.jpg)`;
       else sw.style.background = `linear-gradient(135deg, #${v.sky.toString(16).padStart(6, '0')} 50%, #${v.court.toString(16).padStart(6, '0')} 50%)`;
       const tx = document.createElement('span');
       const n = document.createElement('b'); n.textContent = v.name;
