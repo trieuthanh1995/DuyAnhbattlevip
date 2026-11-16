@@ -26,7 +26,7 @@
     SNIPER: { dmg: 40, delay: 1.2, speed: 32, range: 40, width: 0.16 },
     // phá vật cản: mỗi viên đạn vỡ ở lần va chạm thứ 3 vào vật cản = 1 "nhát". Vật cản bé cần hitsMin nhát, to cần hitsMax nhát
     // (nội suy theo diện tích so với vật cản bé/to nhất của mọi bản đồ). Mỗi nhát thu nhỏ dần, nhát cuối thì biến mất. minScale = cỡ còn lại ngay trước nhát cuối.
-    BREAK: { hitsMin: 5, hitsMax: 10, minScale: 0.3 },
+    BREAK: { hitsMin: 3, hitsMax: 5, minScale: 0.3 },
     POWER_BONUS: 10,          // vật phẩm sức mạnh: +10 sát thương mỗi phát (cộng dồn)
     HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
     POWER_TIME: 2,            // vật phẩm sức mạnh: +10 sát thương trong 2 giây, KHÔNG cộng dồn (nhặt thêm chỉ làm mới lại 2s)
@@ -93,7 +93,7 @@
     space: [box(4.8, 5.2, 0.7, 1.9), cir(7.6, 1.2, 0.6), box(2, 2.4, 1.9, 0.7), cir(10.8, 6, 0.6)],
   };
   for (const m of MAPS) m.obstacles = m.obstacles.concat(mirror4(EXTRA[m.id] || []));
-  // khoảng diện tích vật cản (để quy ra số nhát phá, vật cản ngoài khoảng được kẹp về 5 hoặc 10)
+  // khoảng diện tích vật cản (để quy ra số nhát phá, vật cản ngoài khoảng được kẹp về hitsMin hoặc hitsMax)
   const obsArea = (o) => (o.t === 'box' ? o.w * o.d : Math.PI * o.r * o.r);
   const AREAS = MAPS.reduce((a, m) => a.concat(m.obstacles.map(obsArea)), []);
   const SORTED = AREAS.slice().sort((a, b) => a - b), PCT = (p) => SORTED[Math.min(SORTED.length - 1, Math.floor(p * SORTED.length))];
