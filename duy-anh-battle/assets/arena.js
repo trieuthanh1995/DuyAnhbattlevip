@@ -173,9 +173,9 @@
      * Đặt sau vạch cuối sân của mình, cao ~6 m, nhìn chếch xuống khoảng 22°, FOV 42/48/58 theo màn hình,
      * bám theo người chơi một phần (40% theo bề ngang). Công thức lấy từ updateCamera() của Pickle Ball,
      * nhân hệ số k vì sân dài 18 m (Pickle Ball: 13,4 m). Có thêm bước lùi/nâng camera để luôn thấy trọn sân. */
-    // KM: cỡ camera ở menu (nhìn cả sân lớn). KG: cỡ camera khi chơi giữ như sân cũ (18 m) và BÁM THEO người chơi,
-    // vì sân đã gấp đôi nên không còn nhìn trọn cả sân một lúc.
-    const KM = map.HW / 6.7, K = 9 / 6.7;
+    // KM: cỡ camera ở menu (nhìn cả sân lớn). KG: cỡ camera khi chơi = cỡ của sân cũ 18 m kéo xa thêm ×1,35 (nhìn được nhiều sân hơn)
+    // và BÁM THEO người chơi; phần sân ngoài khung được bù bằng mũi tên chỉ hướng + bản đồ mini.
+    const KM = map.HW / 6.7, K = 1.35 * 9 / 6.7;
     const camPos = new T.Vector3(), camLook = new T.Vector3(), _t1 = new T.Vector3();
     let snap = true;
     world.setView = (w, h, myTeam) => {
@@ -207,7 +207,7 @@
           // Độ dẫn dọc (theo trục camera) lớn hơn độ dẫn ngang; màn dọc điện thoại dẫn ngang ít hơn vì khung hẹp.
           let fx = o.px, fz = o.pz;
           if (o.aim != null) {
-            const Lf = world.portrait ? 5.4 : 6, Ll = world.portrait ? 2.2 : 4;
+            const Lf = world.portrait ? 2.7 : 3, Ll = world.portrait ? 1.1 : 2;
             const dx = Math.sin(o.aim), dz = Math.cos(o.aim), phi = stage.rotation.y, c = Math.cos(phi), sn = Math.sin(phi);
             const wx = dx * c + dz * sn, wz = -dx * sn + dz * c;          // hướng ngắm trong hệ camera
             const lcx = wx * Ll, lcz = wz * Lf;                            // độ dẫn trong hệ camera
@@ -218,7 +218,7 @@
         }
         const n = (portrait ? 8.4 : shortL ? 7.6 : 6.2) * K, a = (portrait ? 12.6 : shortL ? 13.1 : 12.4) * K, sb = (portrait ? 8.6 : 5.9) * K;
         // camera đi theo người mình cả chiều dọc lẫn ngang (giới hạn để không lòi ra ngoài sân quá xa)
-        const camZ = a + (pz + 5 * K - sb);       // 5K: nhân vật nằm giữa khung khi nhìn về sau, thấp hơn khi nhìn về trước
+        const camZ = a + (pz + 3.5 * K - sb);     // 3.5K: nhân vật hơi thấp hơn giữa khung, luôn nằm trong khung ở mọi hướng ngắm
         const ang = Math.atan2(n, a - sb) - (camera.fov / 2) * Math.PI / 180;
         const lookZ = camZ - n / Math.tan(Math.max(0.2, ang));
         const lim = map.HD + 2 * K;

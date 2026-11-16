@@ -27,7 +27,7 @@
     HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
     POWER_TIME: 2,            // vật phẩm sức mạnh: +10 sát thương trong 2 giây, KHÔNG cộng dồn (nhặt thêm chỉ làm mới lại 2s)
     PICKUP_EVERY: 3, PICKUP_MAX: 8, PICKUP_LIFE: 16, PICKUP_R: 0.55,
-    HW: 18, HD: 11,           // nửa chiều dài / nửa chiều rộng sân (m) – sân 36×22, gấp đôi mỗi chiều so với bản cũ
+    HW: 13, HD: 8,            // nửa chiều dài / nửa chiều rộng sân (m) – sân 26×16, rộng gấp đôi DIỆN TÍCH bản cũ (18×11)
     CHAR_SCALE: 1.3,          // hệ số phóng to nhân vật khi hiển thị
   };
   const PICKUP_TYPES = ['heal', 'power', 'shield', 'freeze'];
@@ -48,7 +48,7 @@
     }
     return out;
   }
-  const SPAWNS = { A: [[-16.3, -2.5], [-16.3, 2.5]], B: [[16.3, -2.5], [16.3, 2.5]] };
+  const SPAWNS = { A: [[-11.7, -2], [-11.7, 2]], B: [[11.7, -2], [11.7, 2]] };
   const MAPS = [
     { id: 'candy', name: 'Sân Kẹo Ngọt', desc: 'Hộp quà & kẹo tròn · nhiều chỗ nấp', sky: 0xffd6ea, court: 0xff9ec7,
       theme: { floor: 0xffc2dc, floor2: 0xffadd0, wall: 0xff7eb3, wallTop: 0xffe3f0, outer: 0xffe9a8, obst: 0x7bd3ff, obst2: 0xffe066, accent: 0xff4f93, circle: 'scoop', box: 'gift' },
@@ -69,24 +69,24 @@
       theme: { floor: 0x4a4bb8, floor2: 0x5b5cd0, wall: 0x2a2d6a, wallTop: 0x8f93ff, outer: 0x0f1236, obst: 0x9b8cff, obst2: 0x5ad1ff, accent: 0xffd23f, circle: 'pillar', box: 'block' },
       obstacles: mirror4([box(3.6, 0, 0.8, 3), box(0, 4.3, 4, 0.7), cir(7, 4, 0.9), cir(0, 0, 0.9)]) },
   ];
-  // bố cục vẽ gốc cho sân 18×11 (thu ×0.82 vị trí, ×0.9 kích thước); sân mới gấp đôi mỗi chiều nên
-  // vị trí vật cản ×2 và kích thước phóng thêm ×1.3 để sân vẫn có chỗ nấp
-  const POS_K = 0.82 * (C.HW / 9), SIZE_K = 0.9 * 1.3;
+  // bố cục vẽ gốc cho sân 18×11 (thu ×0.82 vị trí, ×0.9 kích thước); sân mới 26×16 nên vị trí vật cản
+  // nhân theo tỉ lệ sân (HW/9) và kích thước phóng thêm ×1.15 để sân vẫn có chỗ nấp
+  const POS_K = 0.82 * (C.HW / 9), SIZE_K = 0.9 * 1.15;
   for (const m of MAPS) {
     m.HW = C.HW; m.HD = C.HD; m.spawns = SPAWNS;
     m.obstacles = m.obstacles.map((o) => o.t === 'box'
       ? Object.assign({}, o, { x: +(o.x * POS_K).toFixed(2), z: +(o.z * POS_K).toFixed(2), w: +(o.w * SIZE_K).toFixed(2), d: +(o.d * SIZE_K).toFixed(2) })
       : Object.assign({}, o, { x: +(o.x * POS_K).toFixed(2), z: +(o.z * POS_K).toFixed(2), r: +(o.r * SIZE_K).toFixed(2) }));
   }
-  // Vật cản BỔ SUNG cho sân lớn 36×22 (toạ độ cuối cùng, 1 góc phần tư rồi tự lấy đối xứng 4 góc).
-  // Giữ trống vùng quanh chỗ xuất phát (x ≈ ±16) để không bị kẹt khi vào trận.
+  // Vật cản BỔ SUNG (toạ độ cuối cùng, 1 góc phần tư rồi tự lấy đối xứng 4 góc), rải vào các chỗ trống lớn
+  // của sân 26×16; giữ trống quanh chỗ xuất phát và chừa khoảng hở đủ cho nhân vật lách qua.
   const EXTRA = {
-    candy: [cir(8.5, 0, 1.0), box(7.6, 3.9, 1.4, 1.4), cir(13, 9, 1.0), box(0, 9.2, 1.3, 1.3), box(7.8, 8.8, 1.6, 1.6), cir(12.6, 2.2, 0.9), cir(3.0, 9.2, 0.8), box(15, 6.2, 1.3, 1.3)],
-    mushroom: [cir(8.6, 1.6, 0.9), cir(13.2, 9.0, 0.9), cir(3.4, 8.4, 0.8), cir(10.8, 0, 0.8), cir(6.6, 5.6, 0.7), cir(15.6, 7.4, 0.8), box(13.6, 2.4, 1.4, 0.6), cir(2.2, 4.9, 0.7)],
-    beach: [box(8.8, 6.8, 1.6, 1.1), cir(13.2, 2.3, 0.8), box(0, 9.2, 2.2, 1.0), cir(6.0, 0, 0.8), cir(3.4, 9.4, 0.8), box(11.8, 9.4, 1.8, 1.0), cir(15.2, 8.7, 0.8), box(15.6, 4.8, 1.0, 1.2)],
-    ice: [cir(6.2, 1.4, 0.7), cir(14.5, 9.2, 0.8), cir(5.8, 8.6, 0.7), cir(2.4, 9.3, 0.7), cir(13.8, 5.0, 0.7), cir(8.4, 0, 0.8), cir(0, 3.5, 0.7), cir(15.4, 6.6, 0.6)],
-    toy: [box(6.5, 0, 1.0, 2.4), box(13.6, 2.6, 0.8, 1.6), box(14.8, 9.0, 1.6, 1.0), box(4.5, 8.8, 1.6, 1.0), box(0, 9.3, 2.0, 0.8), box(10.5, 0, 2.0, 0.8), box(6.2, 6.5, 1.2, 1.2), box(15.2, 5.8, 0.9, 0.9)],
-    space: [box(9.5, 3.0, 0.8, 2.6), box(12.4, 0, 0.8, 3.0), cir(8.2, 5.9, 0.7), cir(15.2, 8.6, 0.8), box(3.0, 3.8, 2.0, 0.7), box(5.6, 9.0, 2.4, 0.7), cir(15.4, 5.2, 0.8), cir(0, 3.6, 0.6)],
+    candy: [cir(7.6, 1.6, 0.8), box(2.8, 6, 1.1, 1.1), cir(10.8, 6, 0.8), box(5.2, 6.4, 1.1, 1.1)],
+    mushroom: [cir(7.6, 1.2, 0.7), cir(10.8, 6, 0.85), cir(2.8, 4.8, 0.6)],
+    beach: [box(6.4, 6, 1.5, 0.9), cir(4.4, 1.2, 0.7)],
+    ice: [cir(3.2, 5.6, 0.65), cir(10.8, 6, 0.75), cir(5.2, 1.2, 0.55), cir(6.4, 6.4, 0.55)],
+    toy: [box(8, 1.2, 1.1, 1.1), box(2.8, 6, 0.8, 1.7), box(11.2, 5.6, 1.7, 0.8)],
+    space: [box(4.8, 5.2, 0.7, 1.9), cir(7.6, 1.2, 0.6), box(2, 2.4, 1.9, 0.7), cir(10.8, 6, 0.6)],
   };
   for (const m of MAPS) m.obstacles = m.obstacles.concat(mirror4(EXTRA[m.id] || []));
   const VENUES = MAPS;   // ui.js dùng tên VENUES cho danh sách sân

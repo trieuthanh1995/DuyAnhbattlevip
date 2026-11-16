@@ -31,7 +31,7 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
    Tay cầm  : cần trái đi, cần phải ngắm, RT/RB bắn.
 
 5) CAMERA
-   (Sân giờ 36×22 m, camera bám theo nhân vật.) Giống Pickle Ball: đặt sau vạch cuối sân của đội mình, cao, nhìn chếch xuống, bám theo nhân vật;
+   (Sân 26×16 m, gấp đôi diện tích bản cũ. Camera kéo xa hơn, bám theo nhân vật và hơi dẫn về phía trước mặt; có mũi tên chỉ hướng đối thủ ngoài màn hình và bản đồ mini ở góc phải.) Giống Pickle Ball: đặt sau vạch cuối sân của đội mình, cao, nhìn chếch xuống, bám theo nhân vật;
    đội B (online) cũng nhìn từ phía của mình. Công thức nằm trong assets/arena.js (world.updateCamera).
 
 6) CHẾ ĐỘ

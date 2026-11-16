@@ -462,6 +462,96 @@
     }
   }
 
+  /* ================= Bản đồ mini + mũi tên chỉ hướng đối thủ ================= */
+  // Camera chỉ thấy một phần sân lớn nên: (1) mũi tên ở mép màn hình chỉ hướng đối thủ đang ngoài khung hình,
+  // (2) bản đồ mini ở góc phải hiện mình, đồng đội, đối thủ và vật phẩm. Cả hai xoay cùng chiều với camera
+  // (đối thủ luôn ở phía trên) để nhìn là hiểu ngay.
+  const miniEl = $('#minimap'), arrowBox = $('#offarrows'), hudEl = $('#hud');
+  const miniState = { base: null, key: '', w: 0, h: 0, dpr: 1 };
+  const arrowEls = new Map();
+  const PK_COL = { heal: '#4cd964', power: '#ff9f1c', shield: '#38c8ff', freeze: '#9ee6ff' };
+  const hexCol = (n) => typeof n === 'number' ? '#' + n.toString(16).padStart(6, '0') : n;
+  /** toạ độ sân (sim) → (u sang phải, v lên trên) theo chiều camera */
+  function toUV(x, z) {
+    const phi = world.stage.rotation.y, c = Math.cos(phi), sn = Math.sin(phi);
+    return { u: x * c + z * sn, v: -(-x * sn + z * c) };
+  }
+  function miniSetup() {
+    const m = world.map, short = Math.min(window.innerWidth, window.innerHeight) < 480;
+    const w = short ? 58 : window.innerWidth < 700 ? 72 : 92, h = Math.round(w * m.HW / m.HD);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const key = [m.id, w, h, dpr, world.stage.rotation.y].join('|');
+    if (key === miniState.key) return;
+    miniState.key = key; miniState.w = w; miniState.h = h; miniState.dpr = dpr;
+    miniEl.width = Math.round(w * dpr); miniEl.height = Math.round(h * dpr); miniEl.style.width = w + 'px'; miniEl.style.height = h + 'px';
+    // lớp nền tĩnh: sân + vạch giữa + vật cản
+    const base = document.createElement('canvas'); base.width = miniEl.width; base.height = miniEl.height;
+    const g = base.getContext('2d'); g.scale(dpr, dpr);
+    const sc = w / (2 * m.HD);
+    const P = (x, z) => { const q = toUV(x, z); return [w / 2 + q.u * sc, h / 2 - q.v * sc]; };
+    g.fillStyle = 'rgba(255,255,255,0.86)'; g.fillRect(0, 0, w, h);
+    g.fillStyle = hexCol(m.theme.floor); g.globalAlpha = 0.55; g.fillRect(0, 0, w, h); g.globalAlpha = 1;
+    g.strokeStyle = 'rgba(30,40,80,0.28)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+    g.fillStyle = hexCol(m.theme.obst2 != null ? m.theme.obst : 0x888888); g.strokeStyle = 'rgba(30,40,80,0.55)';
+    for (const o of m.obstacles) {
+      g.beginPath();
+      if (o.t === 'circle') { const p = P(o.x, o.z); g.arc(p[0], p[1], Math.max(1.5, o.r * sc), 0, Math.PI * 2); }
+      else { const cs = [[-1, -1], [1, -1], [1, 1], [-1, 1]]; cs.forEach(([a, b], i) => { const p = P(o.x + a * o.w / 2, o.z + b * o.d / 2); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }); g.closePath(); }
+      g.fill(); g.stroke();
+    }
+    g.strokeStyle = 'rgba(30,40,80,0.6)'; g.lineWidth = 2; g.strokeRect(1, 1, w - 2, h - 2);
+    miniState.base = base;
+  }
+  function updateRadar() {
+    const hudOn = !hudEl.classList.contains('hidden');
+    if (!hudOn || !world || mode === 'menu') return;
+    // ----- bản đồ mini -----
+    miniSetup();
+    const m = world.map, w = miniState.w, h = miniState.h, sc = w / (2 * m.HD), ctx = miniEl.getContext('2d');
+    ctx.setTransform(miniState.dpr, 0, 0, miniState.dpr, 0, 0); ctx.clearRect(0, 0, w, h); ctx.drawImage(miniState.base, 0, 0, w, h);
+    const P = (x, z) => { const q = toUV(x, z); return [w / 2 + q.u * sc, h / 2 - q.v * sc]; };
+    if (pickups) for (const k of pickups.list.values()) {
+      const p = P(k.x, k.z); ctx.fillStyle = PK_COL[k.type] || '#fff'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p[0], p[1], 2.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    for (const p of players.values()) {
+      if (!p.alive) continue;
+      const q = P(p.x, p.z), col = hexCol(Arena.TEAM_COL[p.team]);
+      ctx.fillStyle = col; ctx.strokeStyle = '#fff'; ctx.lineWidth = p.isMe ? 2 : 1.2;
+      ctx.beginPath(); ctx.arc(q[0], q[1], p.isMe ? 4.4 : 3.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (p.isMe) {   // vạch chỉ hướng ngắm của mình
+        const d = toUV(Math.sin(p.aim), Math.cos(p.aim));
+        ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0] + d.u * 9, q[1] - d.v * 9); ctx.stroke();
+      }
+    }
+    // ----- mũi tên chỉ hướng đối thủ ngoài màn hình -----
+    const W = window.innerWidth, H = window.innerHeight, seen = new Set();
+    if (me && me.alive && mode !== 'spectate') {
+      const mL = 30, mR = 30, mT = 90, mB = window.innerWidth < 700 ? 150 : 84;
+      const cx = (mL + W - mR) / 2, cy = (mT + H - mB) / 2, hw = (W - mL - mR) / 2, hh = (H - mT - mB) / 2;
+      for (const p of players.values()) {
+        if (p === me || p.team === me.team || !p.alive || !p.holder.visible) continue;
+        seen.add(p.id);
+        const pt = world.project(p.x, 0.8, p.z);
+        const inside = pt.vis && pt.x > 10 && pt.x < W - 10 && pt.y > 64 && pt.y < H - 10;   // chỉ hiện mũi tên khi đối thủ thật sự ra khỏi màn hình
+        let el = arrowEls.get(p.id);
+        if (!el) { el = document.createElement('div'); el.className = 'oarrow'; el.innerHTML = '<i></i><b></b>'; el.style.setProperty('--c', hexCol(Arena.TEAM_COL[p.team])); arrowBox.append(el); arrowEls.set(p.id, el); }
+        if (inside) { el.style.display = 'none'; continue; }
+        let dx = pt.x - cx, dy = pt.y - cy; if (!pt.vis) { dx = -dx; dy = -dy; }
+        if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) dy = 1;
+        const k = Math.min(hw / Math.max(1e-3, Math.abs(dx)), hh / Math.max(1e-3, Math.abs(dy)));
+        let ax = cx + dx * k, ay = cy + dy * k;
+        // tránh đè lên bản đồ mini: nếu trùng thì đẩy mũi tên sang trái hoặc xuống dưới (hướng nào ít xê dịch hơn)
+        const mr = miniEl.getBoundingClientRect();
+        if (ax > mr.left - 24 && ay < mr.bottom + 24) { const dl = ax - (mr.left - 24), dd = mr.bottom + 24 - ay; if (dl < dd) ax = mr.left - 24; else ay = mr.bottom + 24; }
+        el.style.display = ''; el.style.transform = 'translate(' + ax.toFixed(1) + 'px,' + ay.toFixed(1) + 'px)';
+        el.firstChild.style.transform = 'rotate(' + Math.atan2(dy, dx).toFixed(3) + 'rad)';
+        el.lastChild.textContent = Math.round(Math.hypot(p.x - me.x, p.z - me.z)) + 'm';
+      }
+    }
+    for (const [id, el] of arrowEls) if (!seen.has(id)) { el.remove(); arrowEls.delete(id); }
+  }
+
   function gameUpdate(dt) {
     controlMe(dt);
     session.update(dt);
@@ -491,6 +581,7 @@
     // camera 3D kiểu Pickle Ball: sau vạch cuối sân của mình, bám theo nhân vật
     shake = Math.max(0, shake - dt * 3);
     world.updateCamera(dt, { menu: mode === 'menu', t: time, px: me ? me.x : null, pz: me ? me.z : null, aim: me && me.alive ? me.aim : null, shake: shake * 0.3 });
+    updateRadar();
     document.body.classList.toggle('frozen-fx', !!(me && me.fr > 0 && me.alive));
   }
   /** Nền menu: hai nhân vật đứng bắn nước qua lại cho vui mắt */
