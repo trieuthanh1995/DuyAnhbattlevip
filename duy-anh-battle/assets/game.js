@@ -258,8 +258,8 @@
       }
       case 'bpop': {
         if (!bullets) break;
-        const b = bullets.remove(e.id);
-        if (b || e.hit) { fx.burst(e.x, e.z, 0x9fe0ff, e.hit ? 9 : 5, 2, 0.55, 0.07); if (!e.hit && Math.random() < 0.7) A.bubblePop(); }
+        const b = bullets.remove(e.id), bc = (b && b.burstCol) || bullets.cols.get(e.id) || 0x9fe0ff;
+        if (b || e.hit) { fx.burst(e.x, e.z, bc, e.hit ? 9 : 5, 2, 0.55, 0.07); if (!e.hit && Math.random() < 0.7) A.bubblePop(); }
         break;
       }
       case 'obs_break': {
@@ -583,8 +583,8 @@
     }
     stones.update(dt, null);
     bullets.update(dt, t, {
-      onBounce(b) { fx.burst(b.x, b.z, 0x9fe0ff, 2, 1.2, 0.55, 0.05); if (Math.random() < 0.5) A.bubbleBounce(); },
-      onPop(b) { fx.burst(b.x, b.z, 0x9fe0ff, 4, 1.5, 0.55, 0.06); },
+      onBounce(b) { fx.burst(b.x, b.z, b.burstCol, 2, 1.2, 0.55, 0.05); if (Math.random() < 0.5) A.bubbleBounce(); },
+      onPop(b) { fx.burst(b.x, b.z, b.burstCol, 4, 1.5, 0.55, 0.06); },
     });
   }
 
@@ -614,7 +614,7 @@
       s.kick = 1;
       bullets.spawn({ id: 'm' + Math.random(), x: s.x + Math.sin(s.aim) * 0.6, z: s.z + Math.cos(s.aim) * 0.6, vx: Math.sin(s.aim) * 9, vz: Math.cos(s.aim) * 9, dmg: 10 }, s.team, 0);
     }
-    bullets.update(dt, time, { onPop(bb) { fx.burst(bb.x, bb.z, 0x9fe0ff, 4, 1.5, 0.55, 0.06); } });
+    bullets.update(dt, time, { onPop(bb) { fx.burst(bb.x, bb.z, bb.burstCol, 4, 1.5, 0.55, 0.06); } });
   }
 
   let lastT = 0;

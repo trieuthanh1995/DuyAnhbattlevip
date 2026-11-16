@@ -9,6 +9,8 @@
   const lin = (hex) => new T.Color(hex).convertSRGBToLinear();
   function mat(hex, o) { return new T.MeshStandardMaterial(Object.assign({ color: lin(hex), roughness: 0.55, metalness: 0.0 }, o || {})); }
   const TEAM_COL = { A: 0x3f8cff, B: 0xff7a45 };
+  // màu bóng nước: đạn của bên mình giữ màu xanh; đạn của đối phương màu đỏ nhạt (so với đội của người đang xem)
+  const BUBBLE = { mine: { body: 0x6fd0ff, burst: 0x9fe0ff }, foe: { body: 0xff9c9c, emissive: 0xff5a5a, burst: 0xffb3b3 } };
   const PK = {
     heal: { emoji: '❤️', color: 0xff5c8a, name: 'Hồi máu' },
     power: { emoji: '💪', color: 0xffb020, name: 'Tăng sức mạnh' },
@@ -303,17 +305,19 @@
   /* ---------- đạn bong bóng (mô phỏng cục bộ cùng công thức với server) ---------- */
   class Bullets {
     constructor(world) {
-      this.world = world; this.list = new Map();
+      this.world = world; this.list = new Map(); this.cols = new Map();   // cols: màu vụn nước theo id đạn (còn dùng khi đạn đã bị xóa cục bộ)
       this.geo = new T.SphereGeometry(1, 16, 12);
       this.hi = new T.SphereGeometry(0.22, 8, 6);
     }
     spawn(e, teamOf, catchUp) {
-      const col = TEAM_COL[teamOf] || 0xffffff;
+      const foe = teamOf !== this.world.myTeam, pal = foe ? BUBBLE.foe : BUBBLE.mine;
+      const col = foe ? pal.emissive : (TEAM_COL[teamOf] || 0xffffff);
       const s = C.RIFLE.r * (1 + Math.min(2, (e.dmg - C.RIFLE.dmg) / 25));
-      const m = new T.Mesh(this.geo, new T.MeshStandardMaterial({ color: lin(0x6fd0ff), transparent: true, opacity: 0.8, roughness: 0.05, metalness: 0.1, emissive: lin(col), emissiveIntensity: 0.4, depthWrite: false }));
+      const m = new T.Mesh(this.geo, new T.MeshStandardMaterial({ color: lin(pal.body), transparent: true, opacity: 0.8, roughness: 0.05, metalness: 0.1, emissive: lin(col), emissiveIntensity: 0.4, depthWrite: false }));
       m.scale.setScalar(s * 1.5);
       const h = new T.Mesh(this.hi, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })); h.position.set(-0.35, 0.4, -0.2); m.add(h);
-      const b = { id: e.id, x: e.x, z: e.z, vx: e.vx, vz: e.vz, r: C.RIFLE.r, bounces: e.bounces || 0, age: 0, mesh: m, s, team: teamOf, seed: Math.random() * 6 };
+      const b = { id: e.id, x: e.x, z: e.z, vx: e.vx, vz: e.vz, r: C.RIFLE.r, bounces: e.bounces || 0, age: 0, mesh: m, s, team: teamOf, burstCol: pal.burst, seed: Math.random() * 6 };
+      this.cols.set(e.id, pal.burst);
       this.world.stage.add(m);
       this.list.set(e.id, b);
       // bù độ trễ mạng: chạy tiếp từ lúc đạn được bắn
@@ -341,7 +345,7 @@
       this.world.stage.remove(b.mesh); b.mesh.material.dispose(); b.mesh.children.forEach((c) => c.material.dispose());
       this.list.delete(id); return b;
     }
-    clear() { for (const id of Array.from(this.list.keys())) this.remove(id); }
+    clear() { for (const id of Array.from(this.list.keys())) this.remove(id); this.cols.clear(); }
   }
 
   /* ---------- đạn ná cao su: viên đá bay thẳng, xuyên vật cản, có vệt sáng ---------- */
