@@ -26,7 +26,8 @@
     SNIPER: { dmg: 40, delay: 1.2, speed: 32, range: 40, width: 0.16 },
     // phá vật cản: mỗi viên đạn vỡ ở lần va chạm thứ 3 vào vật cản = 1 "nhát". Vật cản bé cần hitsMin nhát, to cần hitsMax nhát
     // (nội suy theo diện tích so với vật cản bé/to nhất của mọi bản đồ). Mỗi nhát thu nhỏ dần, nhát cuối thì biến mất. minScale = cỡ còn lại ngay trước nhát cuối.
-    BREAK: { hitsMin: 3, hitsMax: 5, minScale: 0.3 },
+    // chip: mỗi lần đạn NẢY vào vật cản (lần va chạm 1, 2) cũng làm sứt nửa nhát, để súng nước phá nhanh hơn; lần thứ 3 vẫn tính trọn 1 nhát.
+    BREAK: { hitsMin: 3, hitsMax: 5, minScale: 0.3, chip: 0.5 },
     POWER_BONUS: 10,          // vật phẩm sức mạnh: +10 sát thương mỗi phát (cộng dồn)
     HEAL: 10, SHIELD: 2, FREEZE: 1,   // đóng băng 1s: đứng im nhưng vẫn ngắm & bắn được
     POWER_TIME: 2,            // vật phẩm sức mạnh: +10 sát thương trong 2 giây, KHÔNG cộng dồn (nhặt thêm chỉ làm mới lại 2s)

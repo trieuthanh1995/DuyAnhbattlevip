@@ -19,7 +19,7 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
      Đầu ván và mỗi lần hồi sinh đều BẤT TỬ 2 giây.
    - Mỗi lần xuất hiện có 100 máu.
    - Súng nước: 1 viên / 0,3s, băng 10 viên rồi thay đạn 0,5s. 10 máu / viên. Không xuyên vật cản. Đạn va chạm 3 lần: 2 lần đầu nảy,
-     lần thứ 3 đạn vỡ; nếu lần đó đập vào vật cản thì tính 1 nhát phá. Vật cản bé cần 3 nhát, to cần 5 nhát (theo diện tích) mới
+     lần thứ 3 đạn vỡ; nếu lần đó đập vào vật cản thì tính 1 nhát phá. Hai lần nảy đầu vào vật cản cũng sứt nửa nhát (C.BREAK.chip). Vật cản bé cần 3 nhát, to cần 5 nhát (theo diện tích) mới
      biến mất, trước đó thu nhỏ dần. Tường bao không bị phá.
    - Ná cao su: 1 phát / 1,2s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 32 m/s (né được, cần ngắm đón đầu),
      xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Tầm bay tối đa 40m.

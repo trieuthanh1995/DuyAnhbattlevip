@@ -115,7 +115,7 @@
   /** Một bước đạn bong bóng: 'bounce' nếu vừa nảy, 'pop' nếu vỡ (lần va chạm thứ 3 hoặc hết giờ).
    *  Khi vỡ do va chạm thứ 3, b.popObs = chỉ số vật cản bị đập (-1 nếu là tường bao hoặc hết giờ) */
   function stepBullet(map, b, dt) {
-    b.x += b.vx * dt; b.z += b.vz * dt; b.age += dt; b.popObs = -1;
+    b.x += b.vx * dt; b.z += b.vz * dt; b.age += dt; b.popObs = -1; b.bounceObs = -1;
     let bounced = false, obsIdx = -1;
     const mx = map.HW - b.r, mz = map.HD - b.r;
     if (b.x > mx) { b.x = mx; b.vx = -Math.abs(b.vx); bounced = true; }
@@ -137,7 +137,8 @@
       if (b.bounces >= C.RIFLE.bounces) { b.popObs = obsIdx; return 'pop'; }
     }
     if (b.age > C.RIFLE.life) return 'pop';
-    return bounced ? 'bounce' : null;
+    if (bounced) { b.bounceObs = obsIdx; return 'bounce'; }
+    return null;
   }
 
   /* ================= Sim ================= */
@@ -363,7 +364,9 @@
         const b = this.bullets[i];
         let dead = false, hitP = null;
         for (let s = 0; s < 2 && !dead; s++) {
-          if (stepBullet(this.map, b, h) === 'pop') { dead = true; break; }
+          const r = stepBullet(this.map, b, h);
+          if (r === 'pop') { dead = true; break; }
+          if (r === 'bounce' && b.bounceObs >= 0) this.breakObstacle(b.bounceObs, b.x, b.z, C.BREAK.chip);   // nảy vào vật cản: sứt nhẹ
           for (const q of this.players) {
             if (!q.alive || q.team === b.team) continue;
             const dx = q.x - b.x, dz = q.z - b.z, rr = C.PLAYER_R + b.r;
@@ -373,7 +376,7 @@
         if (dead) {
           this.bullets.splice(i, 1);
           this.emit({ t: 'bpop', id: b.id, x: b.x, z: b.z, hit: !!hitP });
-          if (!hitP && b.popObs >= 0) this.breakObstacle(b.popObs, b.x, b.z);   // va chạm thứ 3 vào vật cản: phá một phần
+          if (!hitP && b.popObs >= 0) this.breakObstacle(b.popObs, b.x, b.z, 1);   // va chạm thứ 3 vào vật cản: phá một phần
           if (hitP) this.damage(hitP, this.player(b.owner) || { id: b.owner }, b.dmg, 'rifle');
           if (this.phase !== 'fight') break;
         }
@@ -381,17 +384,17 @@
     }
 
     /** Phá một phần vật cản: thu nhỏ lại; quá nhỏ thì biến mất. Tường bao không bao giờ bị phá. */
-    breakObstacle(i, x, z) {
+    breakObstacle(i, x, z, amount) {
       const o = this.map.obstacles[i], K = C.BREAK;
       if (!o || o.gone) return;
-      o.broken = true; o.hits++;
-      if (o.hits >= o.need) o.gone = true;
+      o.broken = true; o.hits += amount;
+      if (o.hits >= o.need - 1e-9) o.gone = true;
       else {
-        // thu nhỏ đều từ 100% xuống minScale sau (need-1) nhát
-        const sc = 1 - (1 - K.minScale) * o.hits / Math.max(1, o.need - 1);
+        // thu nhỏ đều từ 100% xuống minScale khi gần đủ số nhát
+        const sc = 1 - (1 - K.minScale) * o.hits / o.need;
         if (o.t === 'box') { o.w = +(o.w0 * sc).toFixed(3); o.d = +(o.d0 * sc).toFixed(3); } else o.r = +(o.r0 * sc).toFixed(3);
       }
-      this.emit({ t: 'obs_break', i, w: o.w, d: o.d, r: o.r, gone: !!o.gone, hits: o.hits, need: o.need, x, z });
+      this.emit({ t: 'obs_break', i, w: o.w, d: o.d, r: o.r, gone: !!o.gone, hits: o.hits, need: o.need, full: amount >= 1, x, z });
     }
 
     freePoint() {

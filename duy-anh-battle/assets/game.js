@@ -267,9 +267,11 @@
         world.breakObstacle(e);
         miniState.key = '';                     // vẽ lại bản đồ mini
         const col = world.map.theme.obst;
-        fx.burst(e.x, e.z, col, 14, 3.4, 0.8, 0.12); fx.burst(e.x, e.z, 0xffffff, 6, 2.2, 0.6, 0.07);
-        if (e.gone) fx.ring(e.x, e.z, col, 2.2);
-        A.bubblePop();
+        if (e.full || e.gone) {
+          fx.burst(e.x, e.z, col, 14, 3.4, 0.8, 0.12); fx.burst(e.x, e.z, 0xffffff, 6, 2.2, 0.6, 0.07);
+          if (e.gone) fx.ring(e.x, e.z, col, 2.2);
+          A.bubblePop();
+        } else fx.burst(e.x, e.z, col, 4, 2, 0.6, 0.08);   // sứt nhẹ khi nảy: hiệu ứng nhỏ, không kêu
         break;
       }
       case 'pickup_spawn': if (pickups) { pickups.add(e); A.spawnPing(); } break;
