@@ -456,9 +456,10 @@
       const dx = Math.sin(me.aim), dz = Math.cos(me.aim);
       const col = me.w === 'rifle' ? 0x2b2d42 : 0xff9f1c;
       // 2 chấm dẫn đường + 1 chấm to làm tâm
+      const lenK = me.w === 'sniper' ? 2 : 1;            // ná: tâm ngắm dài gấp đôi
       for (const [d, sc, op] of [[1.2, 0.7, 0.55], [1.9, 0.9, 0.7], [AIM_DIST, 2.4, 0.9]]) {
         if (n >= aimDots.length) break;
-        const m = aimDots[n++]; m.visible = true; m.position.x = me.x + dx * d; m.position.z = me.z + dz * d;
+        const m = aimDots[n++]; m.visible = true; m.position.x = me.x + dx * d * lenK; m.position.z = me.z + dz * d * lenK;
         m.material.color.setHex(col); m.scale.setScalar(sc); m.material.opacity = op;
       }
     }
