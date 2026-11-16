@@ -2,7 +2,7 @@
  * Hệ tọa độ: mặt sân là mặt phẳng (x, z). Hướng ngắm `aim` (rad): hướng = (sin aim, cos aim).
  * Đội A xuất phát bên trái (x<0), đội B bên phải (x>0).
  * Sim phát sự kiện vào hàng đợi drain():
- *   select_start, fight, shoot, snipe (đạn ná bay), spop (đạn ná hết đường), hit, dead, respawn, bpop, pickup_spawn, pickup_take, pickup_expire, match_end, over, paused, resumed */
+ *   select_start, fight, shoot, snipe (đạn ná bay), spop (đạn ná hết đường), obs_break (vật cản bị phá), hit, dead, respawn, bpop, pickup_spawn, pickup_take, pickup_expire, match_end, over, paused, resumed */
 (function (root, factory) {
   const isNode = typeof module === 'object' && module.exports;
   const cfg = isNode ? require('./config.js') : root.PP;
@@ -11,10 +11,27 @@
   else { root.PP = root.PP || {}; Object.assign(root.PP, mod); }
 })(typeof self !== 'undefined' ? self : this, function (cfg) {
   'use strict';
-  const { C, MAPS, PICKUP_TYPES } = cfg;
+  const { C, MAPS, PICKUP_TYPES, OBS_AREA, obsArea } = cfg;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const other = (t) => (t === 'A' ? 'B' : 'A');
   const mapOf = (id) => MAPS.find((m) => m.id === id) || MAPS[0];
+  /** Bản sao riêng của bản đồ (vật cản có thể bị phá nên mỗi ván / mỗi màn hình dựng cảnh phải có bản của mình) */
+  /** Số viên đạn cần để phá hết 1 vật cản: 5 (bé nhất) … 10 (to nhất) theo diện tích */
+  function hitsToBreak(o) {
+    const K = C.BREAK, span = Math.max(1e-6, OBS_AREA.max - OBS_AREA.min);
+    const k = clamp((obsArea(o) - OBS_AREA.min) / span, 0, 1);
+    return Math.round(K.hitsMin + k * (K.hitsMax - K.hitsMin));
+  }
+  const cloneMap = (m) => Object.assign({}, m, { obstacles: m.obstacles.map((o) => {
+    const c = Object.assign({}, o); c.w0 = o.w; c.d0 = o.d; c.r0 = o.r; c.need = hitsToBreak(o); c.hits = 0; return c;
+  }) });
+  /** Áp dụng sự kiện obs_break lên bản đồ (dùng ở cả sim lẫn máy khách) */
+  function applyBreak(map, e) {
+    const o = map.obstacles[e.i]; if (!o) return null;
+    if (o.t === 'box') { o.w = e.w; o.d = e.d; } else o.r = e.r;
+    o.broken = true; if (e.gone) o.gone = true;
+    return o;
+  }
   function mulberry32(a) {
     a = a >>> 0;
     return function () {
@@ -28,6 +45,7 @@
   /* ================= hình học ================= */
   /** Vòng tròn (x,z,r) có chạm vật cản o không → {nx,nz,pen} hoặc null */
   function hitObstacle(o, x, z, r) {
+    if (o.gone) return null;                 // vật cản đã bị phá hết
     if (o.t === 'box') {
       const hx = o.w / 2, hz = o.d / 2;
       const cx = clamp(x, o.x - hx, o.x + hx), cz = clamp(z, o.z - hz, o.z + hz);
@@ -94,26 +112,29 @@
     return Math.max(0, t);
   }
 
-  /** Một bước đạn bong bóng: trả về 'pop' nếu vỡ do nảy quá 5 lần / hết giờ, 'bounce' nếu vừa nảy */
+  /** Một bước đạn bong bóng: 'bounce' nếu vừa nảy, 'pop' nếu vỡ (lần va chạm thứ 3 hoặc hết giờ).
+   *  Khi vỡ do va chạm thứ 3, b.popObs = chỉ số vật cản bị đập (-1 nếu là tường bao hoặc hết giờ) */
   function stepBullet(map, b, dt) {
-    b.x += b.vx * dt; b.z += b.vz * dt; b.age += dt;
-    let bounced = false;
+    b.x += b.vx * dt; b.z += b.vz * dt; b.age += dt; b.popObs = -1;
+    let bounced = false, obsIdx = -1;
     const mx = map.HW - b.r, mz = map.HD - b.r;
     if (b.x > mx) { b.x = mx; b.vx = -Math.abs(b.vx); bounced = true; }
     else if (b.x < -mx) { b.x = -mx; b.vx = Math.abs(b.vx); bounced = true; }
     if (b.z > mz) { b.z = mz; b.vz = -Math.abs(b.vz); bounced = true; }
     else if (b.z < -mz) { b.z = -mz; b.vz = Math.abs(b.vz); bounced = true; }
-    for (const o of map.obstacles) {
+    for (let k = 0; k < map.obstacles.length; k++) {
+      const o = map.obstacles[k];
       const h = hitObstacle(o, b.x, b.z, b.r);
       if (!h) continue;
       b.x += h.nx * h.pen; b.z += h.nz * h.pen;
       const dot = b.vx * h.nx + b.vz * h.nz;
       if (dot < 0) { b.vx -= 2 * dot * h.nx; b.vz -= 2 * dot * h.nz; }
       bounced = true;
+      if (obsIdx < 0) obsIdx = k;
     }
     if (bounced) {
       b.bounces++;
-      if (b.bounces > C.RIFLE.bounces) return 'pop';
+      if (b.bounces >= C.RIFLE.bounces) { b.popObs = obsIdx; return 'pop'; }
     }
     if (b.age > C.RIFLE.life) return 'pop';
     return bounced ? 'bounce' : null;
@@ -125,7 +146,7 @@
      *  Luật: đầu ván có SELECT_TIME giây chọn súng (rồi khóa). Mỗi bên có `lives` mạng (2v2 là kho chung của đội);
      *  chết 1 lần mất 1 mạng, còn mạng thì hồi sinh ngẫu nhiên và bất tử SPAWN_SHIELD giây. Hết mạng trước thì thua. */
     constructor(opts) {
-      this.map = mapOf(opts.map || opts.venue);
+      this.map = cloneMap(mapOf(opts.map || opts.venue));
       this.teamSize = opts.teamSize === 2 ? 2 : 1;
       const lv = C.LIVES.includes(opts.lives) ? opts.lives : 5;
       this.livesMax = (lv === 22 && this.teamSize === 1) ? 11 : lv;
@@ -352,10 +373,25 @@
         if (dead) {
           this.bullets.splice(i, 1);
           this.emit({ t: 'bpop', id: b.id, x: b.x, z: b.z, hit: !!hitP });
+          if (!hitP && b.popObs >= 0) this.breakObstacle(b.popObs, b.x, b.z);   // va chạm thứ 3 vào vật cản: phá một phần
           if (hitP) this.damage(hitP, this.player(b.owner) || { id: b.owner }, b.dmg, 'rifle');
           if (this.phase !== 'fight') break;
         }
       }
+    }
+
+    /** Phá một phần vật cản: thu nhỏ lại; quá nhỏ thì biến mất. Tường bao không bao giờ bị phá. */
+    breakObstacle(i, x, z) {
+      const o = this.map.obstacles[i], K = C.BREAK;
+      if (!o || o.gone) return;
+      o.broken = true; o.hits++;
+      if (o.hits >= o.need) o.gone = true;
+      else {
+        // thu nhỏ đều từ 100% xuống minScale sau (need-1) nhát
+        const sc = 1 - (1 - K.minScale) * o.hits / Math.max(1, o.need - 1);
+        if (o.t === 'box') { o.w = +(o.w0 * sc).toFixed(3); o.d = +(o.d0 * sc).toFixed(3); } else o.r = +(o.r0 * sc).toFixed(3);
+      }
+      this.emit({ t: 'obs_break', i, w: o.w, d: o.d, r: o.r, gone: !!o.gone, hits: o.hits, need: o.need, x, z });
     }
 
     freePoint() {
@@ -444,12 +480,13 @@
         livesMax: this.livesMax, sel: Math.max(0, +(this.selectEnd - this.t).toFixed(2)),
         pickups: this.pickups.map((q) => ({ id: q.id, type: q.type, x: q.x, z: q.z, life: Math.max(0, +(q.until - this.t).toFixed(1)) })),
         bullets: this.bullets.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, bounces: b.bounces })),
+        broken: this.map.obstacles.map((o, i) => o.broken ? { i, w: o.w, d: o.d, r: o.r, gone: !!o.gone } : null).filter(Boolean),
         stones: this.stones.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, left: Math.max(0, +(b.len - b.dist).toFixed(2)) })),
         ts: this.wall,
       });
     }
   }
 
-  const Shooter = { Sim, mapOf, mulberry32, hitObstacle, blocked, pushOut, stepMove, segClear, rayToBounds, stepBullet };
+  const Shooter = { Sim, mapOf, cloneMap, hitsToBreak, applyBreak, mulberry32, hitObstacle, blocked, pushOut, stepMove, segClear, rayToBounds, stepBullet };
   return { Shooter, Sim };
 });

@@ -120,7 +120,7 @@
 
   /* ---------- dựng cả sân ---------- */
   function build(renderer, mapId, quality) {
-    const map = Shooter.mapOf(mapId), th = map.theme;
+    const map = Shooter.cloneMap(Shooter.mapOf(mapId)), th = map.theme;   // bản riêng: vật cản có thể bị phá
     const scene = new T.Scene();
     scene.background = lin(map.sky); scene.fog = new T.Fog(lin(map.sky), 70, 240);
     const env = envFor(renderer); if (env) { scene.environment = env; }
@@ -144,7 +144,15 @@
       const m = new T.Mesh(new T.BoxGeometry(w[2], wh, w[3]), mat(th.wall)); m.position.set(w[0], wh / 2, w[1]); m.castShadow = m.receiveShadow = true; g.add(m);
       const cap = new T.Mesh(new T.BoxGeometry(w[2] + 0.1, 0.12, w[3] + 0.1), mat(th.wallTop)); cap.position.set(w[0], wh + 0.04, w[1]); g.add(cap);
     }
-    for (const o of map.obstacles) (o.t === 'box' ? addBox : addCircle)(g, o, th);
+    // mỗi vật cản nằm trong 1 nhóm riêng (pivot ở tâm) để thu nhỏ / ẩn khi bị phá
+    const obsPivots = map.obstacles.map((o) => {
+      const pv = new T.Group(), og = new T.Group();
+      pv.position.set(o.x, 0, o.z); og.position.set(-o.x, 0, -o.z);
+      (o.t === 'box' ? addBox : addCircle)(og, o, th);
+      pv.add(og); g.add(pv);
+      pv.userData = { w0: o.w, d0: o.d, r0: o.r };
+      return pv;
+    });
     // đồ trang trí bên ngoài sân
     const R = rng(map.id.length * 977 + 13), decor = [];
     const cols = [th.accent, th.obst, th.obst2, th.wallTop];
@@ -162,6 +170,14 @@
 
     const world = { renderer, scene, stage, camera, map, sun, g, decor, portrait: false, _t: 0, myTeam: 'A' };
     const _v = new T.Vector3(), _ray = new T.Raycaster(), _pl = new T.Plane(new T.Vector3(0, 1, 0), -0.5);
+    /** Vật cản bị phá (sự kiện obs_break hoặc ảnh chụp đồng bộ): cập nhật bản đồ + hình 3D */
+    world.breakObstacle = (e) => {
+      const o = Shooter.applyBreak(map, e), pv = obsPivots[e.i];
+      if (!o || !pv) return;
+      if (o.gone) { pv.visible = false; return; }
+      const u = pv.userData;
+      if (o.t === 'box') pv.scale.set(o.w / u.w0, 1, o.d / u.d0); else pv.scale.set(o.r / u.r0, 1, o.r / u.r0);
+    };
     world.setQuality = (q) => {
       q = qOf(q); const s = QUALITY[q].shadow;
       sun.castShadow = s > 0;

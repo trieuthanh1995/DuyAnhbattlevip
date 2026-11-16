@@ -262,6 +262,16 @@
         if (b || e.hit) { fx.burst(e.x, e.z, 0x9fe0ff, e.hit ? 9 : 5, 2, 0.55, 0.07); if (!e.hit && Math.random() < 0.7) A.bubblePop(); }
         break;
       }
+      case 'obs_break': {
+        if (!world) break;
+        world.breakObstacle(e);
+        miniState.key = '';                     // vẽ lại bản đồ mini
+        const col = world.map.theme.obst;
+        fx.burst(e.x, e.z, col, 14, 3.4, 0.8, 0.12); fx.burst(e.x, e.z, 0xffffff, 6, 2.2, 0.6, 0.07);
+        if (e.gone) fx.ring(e.x, e.z, col, 2.2);
+        A.bubblePop();
+        break;
+      }
       case 'pickup_spawn': if (pickups) { pickups.add(e); A.spawnPing(); } break;
       case 'power_end': { const q = players.get(e.id); if (q) { q.pw = 0; q.pwt = 0; if (q.isMe) updateHUD(); } break; }
       case 'pickup_expire': if (pickups) pickups.remove(e.id); break;
@@ -501,6 +511,7 @@
     g.strokeStyle = 'rgba(30,40,80,0.28)'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
     g.fillStyle = hexCol(m.theme.obst2 != null ? m.theme.obst : 0x888888); g.strokeStyle = 'rgba(30,40,80,0.55)';
     for (const o of m.obstacles) {
+      if (o.gone) continue;
       g.beginPath();
       if (o.t === 'circle') { const p = P(o.x, o.z); g.arc(p[0], p[1], Math.max(1.5, o.r * sc), 0, Math.PI * 2); }
       else { const cs = [[-1, -1], [1, -1], [1, 1], [-1, 1]]; cs.forEach(([a, b], i) => { const p = P(o.x + a * o.w / 2, o.z + b * o.d / 2); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }); g.closePath(); }
@@ -1264,7 +1275,7 @@
       case 'chat': addChat(m.name, m.text, m.sys); break;
       case 'match_start': startOnlineMatch(m); break;
       case 'sync': if (session) applySync(m.snapshot); break;
-      case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'spop': case 'hit': case 'dead': case 'respawn': case 'bpop':
+      case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'spop': case 'obs_break': case 'hit': case 'dead': case 'respawn': case 'bpop':
       case 'pickup_spawn': case 'pickup_take': case 'pickup_expire': case 'match_end': case 'over': case 'paused': case 'resumed':
         if (session && session.matchId === m.matchId) applyEvent(m);
         break;
@@ -1408,6 +1419,8 @@
     }
     for (const pk of s.pickups) pickups.add(pk);
     for (const b of s.bullets) { const o = players.get(b.owner); bullets.spawn(b, o ? o.team : 'A', 0); }
+    for (const o of (s.broken || [])) world.breakObstacle(o);
+    miniState.key = '';
     for (const b of (s.stones || [])) { const o = players.get(b.owner); stones.spawn(b, o ? o.team : 'A', 0); }
     if (me) ctl.aim = me.aim;
     updateHUD();
