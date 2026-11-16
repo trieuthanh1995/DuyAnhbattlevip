@@ -368,7 +368,7 @@
         for (let s = 0; s < 2 && !dead; s++) {
           const r = stepBullet(this.map, b, h);
           if (r === 'pop') { dead = true; break; }
-          if (r === 'bounce' && b.bounceObs >= 0) this.breakObstacle(b.bounceObs, b.x, b.z, C.BREAK.chip);   // nảy vào vật cản: sứt nhẹ
+          if (r === 'bounce' && b.bounceObs >= 0 && b.bounces >= 2) this.breakObstacle(b.bounceObs, b.x, b.z, C.BREAK.chip);   // chỉ lần va chạm thứ 2 mới sứt nhẹ (lần 1 không gây hại)
           for (const q of this.players) {
             if (!q.alive || q.team === b.team) continue;
             const dx = q.x - b.x, dz = q.z - b.z, rr = C.PLAYER_R + b.r;
