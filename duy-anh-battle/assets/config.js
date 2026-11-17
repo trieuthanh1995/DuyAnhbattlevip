@@ -25,7 +25,7 @@
     RIFLE: { dmg: 10, delay: 0.3, mag: 10, reload: 0.5, speed: 11, r: 0.17, bounces: 3, life: 10 },
     // Ná cao su: 1 viên / 1,5s, 40 máu (3 phát hạ 1 người), đạn đá bay 32 m/s (né được), xuyên vật cản và mọi kẻ địch trên đường bay
     SNIPER: { dmg: 40, delay: 1.5, speed: 32, range: 40, width: 0.16,
-      aimSlow: 0.8,        // đang giữ ngắm: đi chậm còn 80%
+      aimSlow: 0.6,        // đang giữ ngắm: đi chậm còn 60%
       cancelMag: 0.42,     // cần ngắm (cảm ứng / tay cầm) kéo về dưới mức này rồi nhả = hủy phát bắn
       buffer: 0.2,         // nhả tay sớm hơn lúc hồi xong tối đa 0,2s vẫn được nhớ phát bắn
       queue: 0.3 },        // server giữ yêu cầu bắn tối đa 0,3s để bù độ trễ mạng

@@ -450,7 +450,7 @@
       if (inp.aimScreen) { const d = world.dirFromScreen(inp.aimScreen.x, inp.aimScreen.y); if (Math.hypot(d.x, d.z) > 0.01) me.aim = Math.atan2(d.x, d.z); }
       else if (inp.aimMouse) { const g = world.groundAt(inp.aimMouse.px, inp.aimMouse.py); if (g && Math.hypot(g.x - me.x, g.z - me.z) > 0.25) me.aim = Math.atan2(g.x - me.x, g.z - me.z); }
     }
-    // ná cao su: GIỮ nút bắn để ngắm (đi chậm 80%), NHẢ để bắn; kéo cần về gần tâm / chuột phải / X / nút B rồi nhả = hủy
+    // ná cao su: GIỮ nút bắn để ngắm (đi chậm còn 60%), NHẢ để bắn; kéo cần về gần tâm / chuột phải / X / nút B rồi nhả = hủy
     const sniper = me.w === 'sniper', SN = C.SNIPER;
     const aiming = sniper && !!(inp.fire && canShoot);
     if (aiming) {
@@ -468,7 +468,7 @@
     if (canMove) {
       const d = world.dirFromScreen(inp.mx, inp.my);
       const mul = (me.spd > 0 ? C.BOOST_MUL : 1) * (aiming ? SN.aimSlow : 1);
-      Shooter.stepMove(world.map, me, d.x, d.z, dt, mul);   // 👟 giày: nhanh hơn · đang ngắm ná: chậm còn 80%
+      Shooter.stepMove(world.map, me, d.x, d.z, dt, mul);   // 👟 giày: nhanh hơn · đang ngắm ná: chậm còn 60%
     } else { me.vx = me.vz = 0; }
     ctl.fire = !!(inp.fire && canShoot) && !sniper;          // ná không gửi "đang bắn": chỉ gửi phát bắn khi nhả nút (session.snipe)
     // tiếng "hết đạn"

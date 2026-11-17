@@ -24,7 +24,7 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
      biến mất, trước đó thu nhỏ dần. Tường bao không bị phá.
    - Ná cao su: 1 phát / 1,5s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 32 m/s (né được, cần ngắm đón đầu),
      xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Người trúng thứ nhất chịu 100% sát thương, người thứ hai chỉ 50%.
-     Cách bắn: GIỮ nút bắn để ngắm (hiện đường ngắm dài tới mép tường bao đầu tiên, chỉ mình bạn thấy, đi chậm còn 80%),
+     Cách bắn: GIỮ nút bắn để ngắm (hiện đường ngắm dài tới mép tường bao đầu tiên, chỉ mình bạn thấy, đi chậm còn 60%),
      NHẢ tay để bắn. Hủy: chuột phải / phím X / nút B tay cầm, hoặc kéo cần ngắm về gần tâm (dưới C.SNIPER.cancelMag) rồi nhả.
      Nhả khi ná chưa hồi xong thì không bắn; nhả sớm tối đa 0,2s trước lúc hồi xong thì được nhớ và bắn ngay khi hồi xong.
      Bot cầm ná vẫn bắn theo kiểu cũ (không cần giữ/nhả). Số liệu: C.SNIPER (aimSlow, cancelMag, buffer, queue) trong config.js.
