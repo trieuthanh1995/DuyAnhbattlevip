@@ -7,7 +7,7 @@
   else { root.PP = root.PP || {}; Object.assign(root.PP, mod); }
 })(typeof self !== 'undefined' ? self : this, function (cfg) {
   'use strict';
-  const PROTOCOL_VERSION = 3;
+  const PROTOCOL_VERSION = 5;
   const ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const MODES = ['1v1', '2v2'];
   const LIVES = cfg.C.LIVES;
@@ -35,14 +35,15 @@
     return true;
   };
   const settingsOk = (s) => isObj(s) && VENUE_IDS.includes(s.venue) && LIVES.includes(s.lives) &&
-    (s.hp === undefined || isInt(s.hp, cfg.C.HP_MIN, cfg.C.HP_MAX));
+    (s.hp === undefined || isInt(s.hp, cfg.C.HP_MIN, cfg.C.HP_MAX)) && (s.rw === undefined || typeof s.rw === 'boolean');
 
   const V = {
     hello: (m) => isStr(m.deviceId, 64, 8) && isStr(m.name, 40, 1) && CHAR_IDS.includes(m.char) && isInt(m.version, 0, 1e6) && lookOk(m.look) && (m.weapon === undefined || WEAPONS.includes(m.weapon)),
     ping: (m) => isNum(m.c, 0, 1e12),
     queue_join: (m) => MODES.includes(m.mode),
     queue_leave: () => true,
-    room_create: (m) => MODES.includes(m.mode) && settingsOk(m.settings),
+    room_create: (m) => MODES.includes(m.mode) && settingsOk(m.settings) && (m.priv === undefined || typeof m.priv === 'boolean'),
+    rooms_list: () => true,
     room_join: (m) => isStr(m.code, 4, 4),
     room_leave: () => true,
     room_update: (m) => (m.settings === undefined || settingsOk(m.settings)) &&
@@ -61,6 +62,7 @@
     input: (m) => isNum(m.x, -30, 30) && isNum(m.z, -30, 30) && isNum(m.vx, -20, 20) && isNum(m.vz, -20, 20) &&
       isNum(m.aim, -10, 10) && typeof m.fire === 'boolean',
     pick: (m) => WEAPONS.includes(m.w),
+    snipe: (m) => isNum(m.aim, -10, 10),          // nhả nút ngắm ná: xin bắn theo hướng aim
     rematch: () => true,
     spectate: (m) => isStr(m.code, 4, 4),
     spectate_leave: () => true,

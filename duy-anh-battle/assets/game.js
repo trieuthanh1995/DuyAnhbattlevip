@@ -14,7 +14,7 @@
   /* ================= Lưu trữ ================= */
   const DEFAULT_SETTINGS = { quality: 'auto', volume: 80, music: true, sfx: true, musicVol: 50, aimline: true, shake: true, voiceVol: 200, voiceMic: 180 };
   const Save = {
-    data: { wins: 0, losses: 0, char: 'bunny', level: 'pro', venue: 'candy', lives: 5, hp: 0, weapon: 'rifle', mode: 1, muted: false, name: '', deviceId: '', settings: {}, looks: {} },
+    data: { wins: 0, losses: 0, char: 'bunny', level: 'pro', venue: 'candy', lives: 5, hp: 0, weapon: 'rifle', mode: 1, muted: false, name: '', deviceId: '', settings: {}, looks: {}, rw: false },
     load() {
       try { Object.assign(this.data, JSON.parse(localStorage.getItem('bb-save') || '{}')); } catch (e) { /* localStorage bị chặn */ }
       this.data.settings = Object.assign({}, DEFAULT_SETTINGS, this.data.settings || {});
@@ -63,7 +63,7 @@
   }
 
   /* ================= Three.js ================= */
-  let renderer, world = null, clock, bullets, stones, bombs, pickups, fx, aimDots = [];
+  let renderer, world = null, clock, bullets, stones, bombs, pickups, fx, aimDots = [], snLine = null;
   const _v = new THREE.Vector3();
   let shake = 0, time = 0;
 
@@ -74,10 +74,10 @@
   const players = new Map();
   let me = null, myTeam = 'A', myPid = null;
   const V = {};
-  const ctl = { aim: 0, fire: false, sendT: 0, menuT: 0, selShown: -1, emptyT: 0 };
+  const ctl = { aim: 0, fire: false, sendT: 0, menuT: 0, selShown: -1, emptyT: 0, snHeld: false, snCancel: false, snZone: false, snMag: 1 };   // sn*: trạng thái ngắm ná (giữ để ngắm, nhả để bắn)
   function resetView(cfg) {
-    Object.assign(V, { phase: 'idle', hpBase: C.HP, lives: { A: 5, B: 5 }, livesMax: 5, teamSize: 1, venue: 'candy', selEnd: 0, over: false }, cfg || {});
-    ctl.sendT = 0; ctl.selShown = -1;
+    Object.assign(V, { phase: 'idle', hpBase: C.HP, lives: { A: 5, B: 5 }, livesMax: 5, teamSize: 1, venue: 'candy', selEnd: 0, over: false, random: false }, cfg || {});
+    ctl.sendT = 0; ctl.selShown = -1; ctl.snHeld = ctl.snCancel = ctl.snZone = false;
   }
   resetView();
   const now = () => (session ? session.now() : time);
@@ -116,7 +116,7 @@
     if (bullets) bullets.clear();
     if (stones) stones.clear(); if (bombs) bombs.clear();
     if (world) { try { world.dispose(); } catch (e) { /* bỏ qua */ } }
-    world = null; bullets = stones = bombs = pickups = fx = null; aimDots = [];
+    world = null; bullets = stones = bombs = pickups = fx = null; aimDots = []; snLine = null;
     $('#tags').textContent = ''; $('#floaters').textContent = '';
   }
 
@@ -125,6 +125,13 @@
     world = Arena.build(renderer, mapId, quality());
     bullets = new Arena.Bullets(world); stones = new Arena.Stones(world); bombs = new Arena.Bombs(world); pickups = new Arena.Pickups(world); fx = new Arena.Fx(world);
     const dotGeo = new THREE.CircleGeometry(0.07, 8), dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false });
+    // đường ngắm dài của ná: dải mỏng nằm trên sàn, có vạch đứt, kéo từ người bắn tới tường bao
+    { const cv = document.createElement('canvas'); cv.width = 16; cv.height = 64;
+      const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, 16, 36);
+      const tex = new THREE.CanvasTexture(cv); tex.wrapT = THREE.RepeatWrapping; tex.wrapS = THREE.ClampToEdgeWrapping;
+      const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+      snLine = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, color: 0xff9f1c, transparent: true, opacity: 0.85, depthWrite: false }));
+      snLine.position.y = 0.07; snLine.visible = false; snLine.renderOrder = 3; world.stage.add(snLine); }
     for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(dotGeo, dotMat.clone()); m.rotation.x = -Math.PI / 2; m.position.y = 0.06; m.visible = false; world.stage.add(m); aimDots.push(m); }
     for (const p of list) {
       const def = CHAR(p.char), look = p.look || {};
@@ -187,6 +194,8 @@
         for (const q of players.values()) { q.hp = q.hpMax = V.hpBase; q.spd = 0; } V.selEnd = e.ts + e.select; ctl.selShown = -1; V.over = false;
         if (bullets) bullets.clear(); if (stones) stones.clear(); if (bombs) bombs.clear(); if (pickups) pickups.clear();
         for (const pos of e.positions) { const p = players.get(pos.id); if (p) { p.x = pos.x; p.z = pos.z; p.aim = pos.aim; p.yaw = pos.aim; } }
+        V.random = !!e.random; V.selStart = e.ts;
+        if (e.random && e.weapons) for (const id in e.weapons) { const q = players.get(id); if (q) { q.w = e.weapons[id]; q.gun.setKind(q.w); } }   // vũ khí ngẫu nhiên: chọn 1 lần, khóa cả ván
         if (me) ctl.aim = me.aim;
         UI.hideScreens(); UI.banner(null); UI.setMsg('');
         updateHUD();
@@ -373,12 +382,13 @@
       } else if (cfg.opponent) list.push(bot('b1', 'B', cfg.opponent.char, cfg.opponent.name, cfg.level));
       else list.push(bot('b1', 'B', pool[0], CHAR(pool[0]).name, cfg.level));
       this.list = list;
-      this.sim = new Shooter.Sim({ map: cfg.venue, teamSize: cfg.teamSize, lives: cfg.lives, hp: cfg.hp, seed: (Math.random() * 1e9) | 0, players: list.map((p) => ({ id: p.id, team: p.team, weapon: p.weapon })) });
+      this.sim = new Shooter.Sim({ map: cfg.venue, teamSize: cfg.teamSize, lives: cfg.lives, hp: cfg.hp, randomWeapon: !!cfg.rw, seed: (Math.random() * 1e9) | 0, players: list.map((p) => ({ id: p.id, team: p.team, weapon: p.weapon })) });
       this.bots = list.filter((p) => p.isBot).map((p, i) => new PP.BotBrain(this.sim, p.id, p.team === 'A' ? 'pro' : cfg.level, Shooter.mulberry32(((Math.random() * 1e9) | 0) + i)));
     }
     now() { return this.t; }
     start() { this.sim.start(0); this.flush(); }
     pick(w) { this.sim.pick('me', w); }
+    snipe(aim) { this.sim.snipe('me', aim); }
     update(dt) {
       this.t += dt;
       const sim = this.sim, t = this.t;
@@ -404,6 +414,7 @@
     constructor(start) { this.matchId = start.matchId; this.inputT = 0; }
     now() { return net ? net.serverNow() : 0; }
     pick(w) { if (net) net.send({ t: 'pick', w }); }
+    snipe(aim) { if (net) net.send({ t: 'snipe', aim: Math.round(wrapA(aim) * 1000) / 1000 }); }
     update(dt) {
       this.inputT += dt;
       if (me && this.inputT >= 1 / 30) {
@@ -439,11 +450,27 @@
       if (inp.aimScreen) { const d = world.dirFromScreen(inp.aimScreen.x, inp.aimScreen.y); if (Math.hypot(d.x, d.z) > 0.01) me.aim = Math.atan2(d.x, d.z); }
       else if (inp.aimMouse) { const g = world.groundAt(inp.aimMouse.px, inp.aimMouse.py); if (g && Math.hypot(g.x - me.x, g.z - me.z) > 0.25) me.aim = Math.atan2(g.x - me.x, g.z - me.z); }
     }
+    // ná cao su: GIỮ nút bắn để ngắm (đi chậm 80%), NHẢ để bắn; kéo cần về gần tâm / chuột phải / X / nút B rồi nhả = hủy
+    const sniper = me.w === 'sniper', SN = C.SNIPER;
+    const aiming = sniper && !!(inp.fire && canShoot);
+    if (aiming) {
+      if (!ctl.snHeld) { ctl.snHeld = true; ctl.snCancel = false; }
+      ctl.snMag = inp.aimMag; ctl.snZone = inp.aimMag < SN.cancelMag;
+      if (inp.cancel) ctl.snCancel = true;
+    } else if (ctl.snHeld) {
+      ctl.snHeld = false;
+      if (sniper && canShoot && !ctl.snCancel && !ctl.snZone) {
+        if (me.sn <= SN.buffer) { session.snipe(me.aim); }
+        else if (performance.now() - ctl.emptyT > 400) { ctl.emptyT = performance.now(); A.empty(); }   // chưa hồi xong
+      }
+      ctl.snCancel = ctl.snZone = false;
+    }
     if (canMove) {
       const d = world.dirFromScreen(inp.mx, inp.my);
-      Shooter.stepMove(world.map, me, d.x, d.z, dt, me.spd > 0 ? C.BOOST_MUL : 1);   // 👟 giày: chạy nhanh hơn
+      const mul = (me.spd > 0 ? C.BOOST_MUL : 1) * (aiming ? SN.aimSlow : 1);
+      Shooter.stepMove(world.map, me, d.x, d.z, dt, mul);   // 👟 giày: nhanh hơn · đang ngắm ná: chậm còn 80%
     } else { me.vx = me.vz = 0; }
-    ctl.fire = !!(inp.fire && canShoot);
+    ctl.fire = !!(inp.fire && canShoot) && !sniper;          // ná không gửi "đang bắn": chỉ gửi phát bắn khi nhả nút (session.snipe)
     // tiếng "hết đạn"
     if (inp.fire && canShoot && me.w === 'rifle' && me.am === 0 && performance.now() - ctl.emptyT > 400) { ctl.emptyT = performance.now(); A.empty(); }
   }
@@ -451,8 +478,24 @@
   /** Tâm ngắm ngắn: chỉ một vòng tròn nhỏ + vài chấm ngay trước mặt nhân vật (không vẽ quỹ đạo dài) */
   const AIM_DIST = 2.6;
   function updateAimLine() {
-    let n = 0;
-    if (S().aimline && me && me.alive && V.phase === 'fight' && mode !== 'spectate') {
+    let n = 0, laser = false;
+    const live = me && me.alive && V.phase === 'fight' && mode !== 'spectate';
+    if (live && me.w === 'sniper' && ctl.snHeld && snLine) {
+      // đường ngắm dài tới mép tường bao đầu tiên (đá xuyên vật cản nên không bị chặn giữa đường)
+      const dx = Math.sin(me.aim), dz = Math.cos(me.aim);
+      const L = Math.min(C.SNIPER.range, Shooter.rayToBounds(world.map, me.x, me.z, dx, dz));
+      const cancel = ctl.snCancel || ctl.snZone, cool = me.sn > C.SNIPER.buffer;
+      const col = cancel ? 0xff5a5a : cool ? 0x9aa3b2 : 0xff9f1c;
+      snLine.visible = laser = true;
+      snLine.position.set(me.x + dx * L / 2, 0.07, me.z + dz * L / 2);
+      snLine.rotation.y = Math.atan2(dx, dz);
+      snLine.scale.set(cancel ? 0.07 : 0.14, 1, L);
+      snLine.material.color.setHex(col); snLine.material.opacity = cancel ? 0.45 : cool ? 0.6 : 0.9;
+      snLine.material.map.repeat.set(1, L / 1.1);
+      const m = aimDots[n++]; m.visible = true;                     // chấm to ở điểm chạm tường bao
+      m.position.x = me.x + dx * L; m.position.z = me.z + dz * L;
+      m.material.color.setHex(col); m.scale.setScalar(2.6); m.material.opacity = 0.9;
+    } else if (S().aimline && live) {
       const dx = Math.sin(me.aim), dz = Math.cos(me.aim);
       const col = me.w === 'rifle' ? 0x2b2d42 : 0xff9f1c;
       // 2 chấm dẫn đường + 1 chấm to làm tâm
@@ -463,6 +506,7 @@
         m.material.color.setHex(col); m.scale.setScalar(sc); m.material.opacity = op;
       }
     }
+    if (snLine && !laser) snLine.visible = false;
     for (let i = n; i < aimDots.length; i++) aimDots[i].visible = false;
   }
 
@@ -600,7 +644,7 @@
     // 5 giây đầu ván: chọn vũ khí (rồi khóa)
     if (V.phase === 'select') {
       const left = V.selEnd - t;
-      if (me) showPick(true, left); else UI.setMsg('Người chơi đang chọn vũ khí…');
+      if (me) showPick(true, left); else UI.setMsg(V.random ? 'Vũ khí được chọn ngẫu nhiên…' : 'Người chơi đang chọn vũ khí…');
       const sec = Math.ceil(left - 0.02);
       if (sec >= 1 && sec <= C.SELECT_TIME && sec !== ctl.selShown) { ctl.selShown = sec; if (sec <= 3) A.beep(false); }
     }
@@ -707,10 +751,23 @@
     el.classList.toggle('hidden', !on);
     if (!on) return;
     $('#pick-t').textContent = Math.max(0, Math.ceil(left));
+    const rnd = !!V.random;
+    $('#pick-title').textContent = rnd ? '🎲 Vũ khí ngẫu nhiên' : 'Chọn vũ khí';
+    $('#pick-sub').classList.toggle('hidden', rnd); $('#pick-sub-r').classList.toggle('hidden', !rnd);
+    $('#pick-row').classList.toggle('hidden', rnd); $('#pick-roll').classList.toggle('hidden', !rnd);
+    if (rnd) {
+      // quay ngẫu nhiên ~1,3 giây rồi dừng ở vũ khí đã được chọn (chọn 1 lần cho cả ván)
+      const elapsed = C.SELECT_TIME - left, spinning = elapsed < 1.3, w = spinning ? (Math.floor(elapsed * 9) % 2 ? 'sniper' : 'rifle') : (me && me.w) || 'rifle';
+      $('#pick-roll-ic').textContent = w === 'sniper' ? '🎯' : '💦';
+      $('#pick-roll-name').textContent = spinning ? 'Đang chọn…' : (w === 'sniper' ? 'Ná cao su' : 'Súng nước');
+      $('#pick-roll-desc').textContent = spinning ? '' : (w === 'sniper' ? 'Giữ để ngắm, nhả để bắn · 40 máu/phát · đạn xuyên vật cản' : 'Giữ để bắn liên tục · 10 máu/viên · đạn nảy, phá vật cản');
+      $('#pick-roll').classList.toggle('done', !spinning);
+      return;
+    }
     el.querySelectorAll('button[data-w]').forEach((b) => b.classList.toggle('sel', !!me && b.dataset.w === me.w));
   }
   function pickWeapon(w) {
-    if (!me || V.phase !== 'select' || !session) return;
+    if (!me || V.phase !== 'select' || !session || V.random) return;
     me.w = w; session.pick(w); A.click();
   }
   function showHUD(on) {
@@ -733,6 +790,7 @@
   function goMenu() {
     endSession();
     PP.Voice.disable(true);
+    if (roomsTimer) { clearInterval(roomsTimer); roomsTimer = 0; }
     if (net) { net.send({ t: 'queue_leave' }); if (room) net.send({ t: 'room_leave' }); net.close(); net = null; room = null; }
     mode = 'menu';
     buildMenuScene();
@@ -752,7 +810,7 @@
     const d = Save.data;
     const teamSize = cupCfg ? 1 : (+d.mode === 2 ? 2 : 1);
     const lv = +d.lives === 22 && teamSize === 1 ? 11 : +d.lives;
-    const cfg = cupCfg || { teamSize, level: d.level, venue: d.venue, lives: lv, hp: PP.normHp(d.hp) };
+    const cfg = cupCfg || { teamSize, level: d.level, venue: d.venue, lives: lv, hp: PP.normHp(d.hp), rw: !!d.rw };
     mode = 'offline';
     session = new OfflineSession(cfg);
     resetView({ teamSize, venue: cfg.venue, hpBase: PP.normHp(cfg.hp), livesMax: cfg.lives, lives: { A: cfg.lives, B: cfg.lives } });
@@ -1221,7 +1279,7 @@
   }
 
   /* ================= Online: sảnh, phòng ================= */
-  let net = null, room = null, pendingRoom = null, queueStart = 0, queueTimer = 0, watchCode = '', lastPing = 0;
+  let net = null, room = null, pendingRoom = null, queueStart = 0, queueTimer = 0, roomsTimer = 0, watchCode = '', lastPing = 0;
   /** Pill trên HUD: mã phòng (để bạn bè nhập mã xem trận) + ping */
   function hudPing() {
     const ms = lastPing, cls = !ms ? '' : ms < 90 ? 'good' : ms < 200 ? 'mid' : 'bad';
@@ -1252,6 +1310,7 @@
     });
     PP.Voice.sendFn = (msg) => !!(net && net.send(msg));
     net.connect();
+    if (!roomsTimer) roomsTimer = setInterval(() => { if (net && net.open && UI.visible('scr-online')) net.send({ t: 'rooms_list' }); }, 3000);   // làm mới danh sách phòng khi đang ở sảnh
     return net;
   }
 
@@ -1262,6 +1321,7 @@
     $('#online-me').textContent = `${CHAR(Save.data.char).emoji} ${Save.data.name}`;
     UI.show('scr-online');
     net.send({ t: 'leaderboard' });
+    net.send({ t: 'rooms_list' });
   }
   function openProfile() {
     $('#profile-name').value = Save.data.name || '';
@@ -1277,6 +1337,7 @@
         if (UI.visible('scr-queue')) { stopQueueTimer(); UI.show('scr-online'); UI.toast('Mất kết nối khi đang tìm trận, hãy tìm lại nhé'); }
         if (pendingRoom) { net.send({ t: 'room_join', code: pendingRoom }); pendingRoom = null; }
         net.send({ t: 'leaderboard' });
+        net.send({ t: 'rooms_list' });
         PP.Voice.onSocketOpen();             // kết nối lại: server đã coi mình rời thoại → nối lại từ đầu
         break;
       case 'voice_peers': case 'voice_joined': case 'voice_left': case 'voice_signal': PP.Voice.handle(m); break;
@@ -1285,6 +1346,7 @@
         if (m.code === 'version') UI.banner('Game đã có bản mới. Vui lòng tải lại trang.');
         if (m.code === 'room_not_found' || m.code === 'room_full') { if (!session) UI.show('scr-online'); }
         break;
+      case 'rooms': renderRooms(m); break;
       case 'queue_status':
         if (m.waiting === false) { stopQueueTimer(); if (!session && !room) UI.show('scr-online'); break; }
         $('#queue-title').textContent = 'Đang tìm trận ' + m.mode + '…';
@@ -1344,6 +1406,42 @@
     }
   }
 
+  /** Danh sách phòng đang mở (bấm Vào là vào ngay) + trận đang diễn ra (bấm Xem) */
+  function renderRooms(m) {
+    const ul = $('#rooms-open'), lv = $('#rooms-live');
+    if (!ul || !lv) return;
+    ul.textContent = '';
+    if (!m.open || !m.open.length) {
+      const li = document.createElement('li'); li.className = 'muted';
+      li.textContent = 'Chưa có phòng nào đang mở. Hãy tạo phòng hoặc bấm "Tìm trận" — ai vào sau sẽ được ghép vào phòng của bạn.';
+      ul.append(li);
+    }
+    for (const r of (m.open || [])) {
+      const li = document.createElement('li'); li.className = 'room-row';
+      const em = UI.avatarEl(r.hostChar, 'em');
+      const info = document.createElement('div'); info.className = 'room-info';
+      const t = document.createElement('b'); t.textContent = r.host + ' · ' + r.mode + ' · ' + r.count + '/' + r.size;
+      const sub = document.createElement('span'); sub.className = 'muted';
+      const st = r.settings || {};
+      sub.textContent = VENUE(st.venue).name + ' · ' + (st.lives || 5) + ' mạng · ' + (st.hp || C.HP) + ' máu' + (st.rw ? ' · 🎲 súng ngẫu nhiên' : '') + (r.mode === '2v2' && r.fillBots ? ' · có bot' : '') + ' · mã ' + r.code;
+      info.append(t, sub);
+      const b = document.createElement('button'); b.className = 'btn tiny primary'; b.textContent = 'Vào';
+      b.onclick = () => { A.click(); net.send({ t: 'room_join', code: r.code }); };
+      li.append(em, info, b); ul.append(li);
+    }
+    lv.textContent = '';
+    if (!m.live || !m.live.length) { const li = document.createElement('li'); li.className = 'muted'; li.textContent = 'Chưa có trận nào đang diễn ra.'; lv.append(li); }
+    for (const r of (m.live || [])) {
+      const li = document.createElement('li'); li.className = 'room-row';
+      const info = document.createElement('div'); info.className = 'room-info';
+      const t = document.createElement('b'); t.textContent = (r.names || []).join(' vs ') + ' · ' + r.mode;
+      const sub = document.createElement('span'); sub.className = 'muted'; sub.textContent = VENUE(r.settings && r.settings.venue).name + ' · mã ' + r.code;
+      info.append(t, sub);
+      const b = document.createElement('button'); b.className = 'btn tiny'; b.textContent = '👁 Xem';
+      b.onclick = () => { A.click(); watchCode = r.code; net.send({ t: 'spectate', code: r.code }); };
+      li.append(info, b); lv.append(li);
+    }
+  }
   function startQueueTimer() {
     stopQueueTimer();
     queueTimer = setInterval(() => {
@@ -1386,9 +1484,10 @@
     $('#room-lives').value = String(room.settings.lives);
     const o22 = $('#room-lives').querySelector('option[value="22"]'); if (o22) { o22.hidden = o22.disabled = room.mode !== '2v2'; }
     if (document.activeElement !== $('#room-hp')) $('#room-hp').value = room.settings.hp || C.HP;
+    $('#room-rw').checked = !!room.settings.rw;
     $('#room-fill').checked = !!room.fillBots;
     $('#room-botlevel').value = room.botLevel || 'pro';
-    for (const id of ['#room-venue', '#room-lives', '#room-hp', '#room-fill', '#room-botlevel']) $(id).disabled = !isHost || room.quick;
+    for (const id of ['#room-venue', '#room-lives', '#room-hp', '#room-rw', '#room-fill', '#room-botlevel']) $(id).disabled = !isHost || room.quick;
     $('#room-fill-wrap').classList.toggle('hidden', room.mode !== '2v2');
     $('#room-host-note').textContent = room.quick ? '(ghép nhanh)' : isHost ? '(bạn là chủ phòng)' : '(chủ phòng chỉnh)';
     const meP = room.players.find((p) => p.id === myPid);
@@ -1557,11 +1656,11 @@
   }
 
   function applySync(s) {
-    V.phase = s.phase; V.lives = s.lives; V.livesMax = s.livesMax || V.livesMax; if (s.hpBase) V.hpBase = s.hpBase; V.sudden = !!s.sd; V.selEnd = s.ts + (s.sel || 0);
+    V.phase = s.phase; V.lives = s.lives; V.livesMax = s.livesMax || V.livesMax; if (s.hpBase) V.hpBase = s.hpBase; V.sudden = !!s.sd; V.selEnd = s.ts + (s.sel || 0); V.random = !!s.rw;
     for (const st of s.players) {
       const p = players.get(st.id); if (!p) continue;
       Object.assign(p, { x: st.x, z: st.z, vx: st.vx, vz: st.vz, aim: st.aim, yaw: st.aim, hp: st.hp, hpMax: st.hm || V.hpBase, spd: st.sp || 0, alive: st.al, am: st.am, rl: st.rl, sn: st.sn, sh: st.sh, fr: st.fr, pw: st.pw, pwt: st.pwt || 0 });
-      if (p.isMe ? s.phase !== 'select' : s.phase !== 'select') p.w = st.w;
+      if (s.phase !== 'select' || s.rw) { p.w = st.w; if (p.gun && p.gun.setKind) p.gun.setKind(p.w); }   // ngẫu nhiên: súng đã định ngay từ đầu ván
       p.buf.length = 0;
       if (!p.alive) { p.holder.visible = p.rs > 0; if (p.tag) p.tag.classList.add('dead'); p.holder.visible = false; }
     }
@@ -1654,8 +1753,9 @@
     UI.$$('[data-queue]').forEach((b) => b.onclick = () => { A.click(); net.send({ t: 'queue_join', mode: b.dataset.queue }); });
     UI.$$('[data-create]').forEach((b) => b.onclick = () => {
       A.click();
-      net.send({ t: 'room_create', mode: b.dataset.create, settings: { venue: Save.data.venue, hp: PP.normHp(Save.data.hp), lives: (b.dataset.create !== '2v2' && +Save.data.lives === 22) ? 11 : +Save.data.lives } });
+      net.send({ t: 'room_create', mode: b.dataset.create, settings: { venue: Save.data.venue, hp: PP.normHp(Save.data.hp), rw: !!Save.data.rw, lives: (b.dataset.create !== '2v2' && +Save.data.lives === 22) ? 11 : +Save.data.lives }, priv: $('#create-priv').checked });
     });
+    $('#btn-rooms-refresh').onclick = () => { A.click(); net.send({ t: 'rooms_list' }); };
     $('#btn-join').onclick = () => {
       const code = $('#join-code').value.trim().toUpperCase();
       if (code.length !== 4) { UI.toast('Mã phòng gồm 4 ký tự'); return; }
@@ -1679,7 +1779,8 @@
       else window.prompt('Sao chép link mời:', link);
     };
     UI.$$('[data-team]').forEach((b) => b.onclick = () => net.send({ t: 'room_update', team: b.dataset.team }));
-    const sendSettings = () => net.send({ t: 'room_update', settings: { venue: $('#room-venue').value, lives: +$('#room-lives').value, hp: PP.normHp($('#room-hp').value) } });
+    const sendSettings = () => net.send({ t: 'room_update', settings: { venue: $('#room-venue').value, lives: +$('#room-lives').value, hp: PP.normHp($('#room-hp').value), rw: $('#room-rw').checked } });
+    $('#room-rw').onchange = sendSettings;
     $('#room-venue').onchange = sendSettings; $('#room-lives').onchange = sendSettings;
     $('#room-hp').onchange = () => { $('#room-hp').value = PP.normHp($('#room-hp').value); sendSettings(); };
     $('#room-fill').onchange = () => net.send({ t: 'room_update', fillBots: $('#room-fill').checked });
@@ -1737,7 +1838,7 @@
   }
   function setupSummary() {
     const d = Save.data, v = VENUE(d.venue);
-    const chips = [CHAR(d.char).name, +d.mode === 2 ? 'Đấu đôi' : 'Đấu đơn', PP.LEVELS[d.level].name, livesFor(d) + ' mạng', PP.normHp(d.hp) + ' máu', PP.Guns.NAMES[d.weapon], v.name];
+    const chips = [CHAR(d.char).name, +d.mode === 2 ? 'Đấu đôi' : 'Đấu đơn', PP.LEVELS[d.level].name, livesFor(d) + ' mạng', PP.normHp(d.hp) + ' máu', d.rw ? '🎲 Vũ khí ngẫu nhiên' : PP.Guns.NAMES[d.weapon], v.name];
     const el = $('#setup-summary'); el.textContent = '';
     for (const c of chips) { const s2 = document.createElement('span'); s2.className = 'chip'; s2.textContent = c; el.append(s2); }
     $('#setup-venue-info').textContent = v.desc;
@@ -1758,6 +1859,7 @@
       else { d.hp = PP.normHp(hpIn.value); hpIn.value = d.hp; }
       Save.save(); setupSummary();
     };
+    UI.seg($('#setup-rw'), d.rw ? 'rnd' : 'pick', (v) => { d.rw = v === 'rnd'; Save.save(); setupSummary(); });
     UI.venueList($('#setup-venue'), d.venue, (v) => { d.venue = v; Save.save(); setupSummary(); });
     UI.show('scr-setup');
     if (!setupPreview && !softwareGL && PP.Character.createPreview) {

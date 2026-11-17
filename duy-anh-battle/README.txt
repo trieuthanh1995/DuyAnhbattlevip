@@ -24,6 +24,10 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
      biến mất, trước đó thu nhỏ dần. Tường bao không bị phá.
    - Ná cao su: 1 phát / 1,5s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 32 m/s (né được, cần ngắm đón đầu),
      xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Người trúng thứ nhất chịu 100% sát thương, người thứ hai chỉ 50%.
+     Cách bắn: GIỮ nút bắn để ngắm (hiện đường ngắm dài tới mép tường bao đầu tiên, chỉ mình bạn thấy, đi chậm còn 80%),
+     NHẢ tay để bắn. Hủy: chuột phải / phím X / nút B tay cầm, hoặc kéo cần ngắm về gần tâm (dưới C.SNIPER.cancelMag) rồi nhả.
+     Nhả khi ná chưa hồi xong thì không bắn; nhả sớm tối đa 0,2s trước lúc hồi xong thì được nhớ và bắn ngay khi hồi xong.
+     Bot cầm ná vẫn bắn theo kiểu cũ (không cần giữ/nhả). Số liệu: C.SNIPER (aimSlow, cancelMag, buffer, queue) trong config.js.
    - ĐỘT TỬ: sau 3 phút giao tranh, máu tối đa của mọi người giảm dần mỗi giây (2% máu gốc/giây) xuống tối thiểu 10% máu gốc, kể cả khi hồi sinh. Chỉnh trong C.SUDDEN. Tầm bay tối đa 40m.
    - Cứ 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân (tối đa 8 cái, biến mất sau 16s):
        ❤️ Hồi 10% máu gốc của trận (100 máu → 10). Nếu máu đã đầy, phần dư được cộng vào máu tối đa, giữ tới khi mất mạng, trần +50% máu gốc   💪 +10 sát thương mỗi phát trong 2s (không cộng dồn, nhặt thêm chỉ tính lại 2s)
@@ -67,3 +71,16 @@ Chat thoại online (WebRTC, làm giống game Pickle Ball):
      hoặc ICE_SERVERS = chuỗi JSON mảng iceServers do nhà cung cấp (Metered, Cloudflare, Twilio…) đưa cho bạn.
      Kiểm tra tại  https://tên-game.onrender.com/ice
    - File: assets/voice.js (WebRTC), game-server.js (chuyển tin báo hiệu), server.js (đường /ice), phần "Chat thoại" trong assets/game.js.
+
+Vũ khí ngẫu nhiên đầu trận:
+   - Trong Đấu với máy (mục "Vũ khí": Tự chọn / 🎲 Ngẫu nhiên) và trong phòng online (ô "Vũ khí ngẫu nhiên đầu trận", chủ phòng chỉnh).
+   - Bật ngẫu nhiên: ngay khi trận bắt đầu, máy chọn súng nước hoặc ná cho MỌI người (kể cả bot), tỉ lệ 50/50 mỗi người. Màn hình hiện hiệu ứng quay
+     khoảng 1,3 giây rồi dừng. Chọn đúng 1 lần, khóa cả trận, không tự chọn lại được. Trận đấu lại thì quay lại từ đầu.
+   - Tắt: giữ nguyên cách cũ, tự chọn trong 5 giây đầu rồi khóa. Server là nơi quay, nên mọi máy thấy cùng một kết quả.
+
+Tìm trận / dò phòng online:
+   - "Tìm trận 1v1/2v2": trước hết tự vào phòng đang mở của người khác (phòng tạo bằng "Tạo phòng", chưa đầy, chưa đấu), nếu không có thì ghép với người
+     cũng đang tìm. Đấu đôi: chờ 10 giây mà chưa đủ 4 người thì được bot thay chỗ trống. Người đang chờ sẽ được kéo vào ngay khi có người tạo phòng.
+   - Sảnh online có danh sách "Phòng đang mở" (bấm Vào) và "Trận đang diễn ra" (bấm Xem), tự làm mới mỗi 3 giây.
+   - Phòng riêng (tích 🔒 khi tạo): không hiện trong danh sách và không bị kéo người vào, chỉ vào bằng mã.
+   - Lưu ý khi thử một mình: 2 tab trên cùng một trình duyệt dùng chung mã thiết bị nên bị tính là 1 người. Hãy dùng 2 thiết bị / 2 trình duyệt khác nhau.

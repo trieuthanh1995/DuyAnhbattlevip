@@ -1,5 +1,7 @@
 /* Duy Anh Battle – điều khiển
  * Máy tính: WASD đi · chuột ngắm · bấm chuột/Space bắn · mũi tên = ngắm + bắn kiểu 2 cần (không cần chuột)
+ *   Ná cao su: GIỮ để ngắm (đường ngắm dài tới tường bao), NHẢ để bắn; chuột phải / phím X = hủy
+ *   (cảm ứng/tay cầm: kéo cần về gần tâm rồi nhả = hủy; tay cầm còn có nút B)
  * Cảm ứng : cần trái = đi, cần phải = ngắm (giữ cần là bắn)
  * Tay cầm : cần trái đi, cần phải ngắm, RT/RB bắn
  * (Vũ khí chọn trong 5 giây đầu ván rồi khóa nên không có phím đổi súng.) */
@@ -9,7 +11,7 @@
   const keys = new Set();
   const S = {
     active: false, touch: false,
-    mouse: { px: 0, py: 0, on: false, down: false },
+    mouse: { px: 0, py: 0, on: false, down: false, right: false },
     move: { x: 0, y: 0 }, aimStick: null, fire: false,
     stickL: null, stickR: null, pad: false,
   };
@@ -55,16 +57,16 @@
     canvas.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'mouse' || !S.active) return;
       S.mouse.px = e.clientX; S.mouse.py = e.clientY; S.mouse.on = true;
-      if (e.button !== 2) S.mouse.down = true;
+      if (e.button !== 2) S.mouse.down = true; else S.mouse.right = true;
     });
-    window.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse' && e.button !== 2) S.mouse.down = false; });
+    window.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') { if (e.button !== 2) S.mouse.down = false; else S.mouse.right = false; } });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     bindStick('#joy-zone', '#joy', '#joy-knob', 'stickL');
     bindStick('#aim-zone', '#aim', '#aim-knob', 'stickR');
   }
   /** Gọi mỗi khung hình: trả về trạng thái điều khiển hiện tại */
   function poll() {
-    const o = { mx: 0, my: 0, aimScreen: null, aimMouse: null, fire: false, touch: S.touch };
+    const o = { mx: 0, my: 0, aimScreen: null, aimMouse: null, fire: false, touch: S.touch, aimMag: 1, cancel: false };
     // di chuyển
     let mx = 0, my = 0;
     if (keys.has('a')) mx -= 1; if (keys.has('d')) mx += 1;
@@ -77,19 +79,21 @@
       const dz = (v) => (Math.abs(v) < 0.2 ? 0 : v);
       mx += dz(gp.axes[0] || 0); my -= dz(gp.axes[1] || 0);
       const ax = dz(gp.axes[2] || 0), ay = dz(gp.axes[3] || 0);
-      if (ax || ay) { o.aimScreen = { x: ax, y: -ay }; o.fire = true; }
+      if (ax || ay) { o.aimScreen = { x: ax, y: -ay }; o.fire = true; o.aimMag = Math.min(1, Math.hypot(ax, ay)); }
+      if ((gp.buttons[1] && gp.buttons[1].pressed)) o.cancel = true;     // nút B: hủy phát ná đang ngắm
       if ((gp.buttons[7] && gp.buttons[7].pressed) || (gp.buttons[5] && gp.buttons[5].pressed)) o.fire = true;
     }
     const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
     o.mx = mx; o.my = my;
     // ngắm: cần phải > mũi tên > chuột
-    if (S.stickR && Math.hypot(S.stickR.x, S.stickR.y) > 0.22) { o.aimScreen = { x: S.stickR.x, y: S.stickR.y }; o.fire = true; }
+    if (S.stickR && Math.hypot(S.stickR.x, S.stickR.y) > 0.22) { o.aimScreen = { x: S.stickR.x, y: S.stickR.y }; o.fire = true; o.aimMag = Math.min(1, Math.hypot(S.stickR.x, S.stickR.y)); }
     let ax = 0, ay = 0;
     if (keys.has('ArrowLeft')) ax -= 1; if (keys.has('ArrowRight')) ax += 1;
     if (keys.has('ArrowUp')) ay += 1; if (keys.has('ArrowDown')) ay -= 1;
     if (ax || ay) { o.aimScreen = { x: ax, y: ay }; o.fire = true; }
     else if (!o.aimScreen && S.mouse.on && !S.touch) o.aimMouse = { px: S.mouse.px, py: S.mouse.py };
     if (S.mouse.down || keys.has(' ') || keys.has('j')) o.fire = true;
+    if (S.mouse.right || keys.has('x')) o.cancel = true;                 // chuột phải / phím X: hủy phát ná đang ngắm
     return o;
   }
   function setActive(on) {

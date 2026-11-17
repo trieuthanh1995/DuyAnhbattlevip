@@ -24,7 +24,11 @@
     // Đạn va chạm 3 lần: 2 lần đầu nảy, lần thứ 3 vỡ ra; nếu lần thứ 3 đập vào VẬT CẢN thì phá một phần vật cản đó (tường bao thì không).
     RIFLE: { dmg: 10, delay: 0.3, mag: 10, reload: 0.5, speed: 11, r: 0.17, bounces: 3, life: 10 },
     // Ná cao su: 1 viên / 1,5s, 40 máu (3 phát hạ 1 người), đạn đá bay 32 m/s (né được), xuyên vật cản và mọi kẻ địch trên đường bay
-    SNIPER: { dmg: 40, delay: 1.5, speed: 32, range: 40, width: 0.16 },
+    SNIPER: { dmg: 40, delay: 1.5, speed: 32, range: 40, width: 0.16,
+      aimSlow: 0.8,        // đang giữ ngắm: đi chậm còn 80%
+      cancelMag: 0.42,     // cần ngắm (cảm ứng / tay cầm) kéo về dưới mức này rồi nhả = hủy phát bắn
+      buffer: 0.2,         // nhả tay sớm hơn lúc hồi xong tối đa 0,2s vẫn được nhớ phát bắn
+      queue: 0.3 },        // server giữ yêu cầu bắn tối đa 0,3s để bù độ trễ mạng
     // phá vật cản: mỗi viên đạn vỡ ở lần va chạm thứ 3 vào vật cản = 1 "nhát". Vật cản bé cần hitsMin nhát, to cần hitsMax nhát
     // (nội suy theo diện tích so với vật cản bé/to nhất của mọi bản đồ). Mỗi nhát thu nhỏ dần, nhát cuối thì biến mất. minScale = cỡ còn lại ngay trước nhát cuối.
     // chip: chỉ lần NẢY thứ 2 vào vật cản làm sứt nửa nhát (lần va chạm 1 không gây hại), để súng nước phá nhanh hơn; lần thứ 3 vẫn tính trọn 1 nhát.

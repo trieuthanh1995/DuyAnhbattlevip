@@ -565,3 +565,18 @@ body.touch #btn-pause { top: 64px; }
 .num-in { width: 120px; padding: 8px 10px; border-radius: 12px; border: 2px solid var(--line); background: #fff; font: inherit; font-weight: 700; color: inherit; }
 .num-in:focus { outline: none; border-color: var(--primary); }
 .num-in:disabled { opacity: 0.6; }
+
+/* vũ khí ngẫu nhiên đầu trận */
+#pick .pick-roll { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 22px; border-radius: 18px; background: #f2f4fb; min-width: 260px; box-shadow: 0 5px 0 rgba(0, 0, 0, 0.12); }
+#pick .pick-roll .pi { font-size: 56px; line-height: 1.1; }
+#pick .pick-roll b { font-size: 20px; }
+#pick .pick-roll small { color: var(--muted); font-size: 12.5px; min-height: 1.3em; }
+#pick .pick-roll.done { background: #fff0f5; box-shadow: 0 0 0 4px var(--primary), 0 5px 0 rgba(0, 0, 0, 0.12); }
+
+/* danh sách phòng đang mở / trận đang diễn ra */
+.rooms-panel { margin-top: 12px; }
+.list.rooms { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.room-row { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 6px rgba(40, 50, 90, 0.1); }
+.room-row .room-info { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; }
+.room-row .room-info .muted { font-size: 12px; }
+.check.priv { display: block; margin: 8px 0 0; font-size: 13px; color: var(--muted); }

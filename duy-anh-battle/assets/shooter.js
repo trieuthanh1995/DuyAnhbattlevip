@@ -152,6 +152,7 @@
       const lv = C.LIVES.includes(opts.lives) ? opts.lives : 5;
       this.livesMax = (lv === 22 && this.teamSize === 1) ? 11 : lv;
       this.lives = { A: this.livesMax, B: this.livesMax };
+      this.randomWeapon = !!opts.randomWeapon;           // vũ khí do máy chọn ngẫu nhiên đầu ván, chọn 1 lần rồi khóa
       this.hpBase = normHp(opts.hp);                    // máu mỗi lần xuất hiện (100–1000)
       this.healAmt = Math.max(1, Math.round(this.hpBase * C.HEAL_PCT));
       this.bombDmg = Math.max(1, Math.round(this.hpBase * C.BOMB.pct));
@@ -182,15 +183,26 @@
         p.x = sp[0]; p.z = sp[1]; p.vx = p.vz = 0;
         p.aim = p.team === 'A' ? Math.PI / 2 : -Math.PI / 2;
       }
-      this.emit({ t: 'select_start', lives: this.livesMax, hp: this.hpBase, select: C.SELECT_TIME,
+      if (this.randomWeapon) for (const p of this.players) p.weapon = this.rng() < 0.5 ? 'rifle' : 'sniper';
+      const weapons = {}; for (const p of this.players) weapons[p.id] = p.weapon;
+      this.emit({ t: 'select_start', lives: this.livesMax, hp: this.hpBase, select: C.SELECT_TIME, random: this.randomWeapon, weapons,
         positions: this.players.map((p) => ({ id: p.id, x: p.x, z: p.z, aim: p.aim })) });
     }
     /** Chọn súng: chỉ được trong 5 giây đầu ván (sau đó đã khóa) */
     pick(id, w) {
-      if (this.phase !== 'select') return false;
+      if (this.phase !== 'select' || this.randomWeapon) return false;    // chế độ ngẫu nhiên: không được tự chọn
       const p = this.player(id);
       if (!p || (w !== 'rifle' && w !== 'sniper')) return false;
       p.weapon = w; return true;
+    }
+
+    /** Ná (người chơi): nhả nút ngắm → xin bắn theo hướng `aim`. Bắn ngay nếu đã hồi, hoặc ngay khi hồi xong trong C.SNIPER.queue giây */
+    snipe(id, aim) {
+      const p = this.player(id);
+      if (!p || !p.alive || this.phase !== 'fight' || p.weapon !== 'sniper' || !(typeof aim === 'number' && Number.isFinite(aim))) return false;
+      if (this.t + C.SNIPER.queue < p.nextSnipe) return false;           // còn hồi lâu: bỏ
+      p.snipeReq = { aim, until: this.t + C.SNIPER.queue };
+      return true;
     }
 
     /** Bot: đặt hướng ngắm / bóp cò (di chuyển do bot tự làm bằng stepMove) */
@@ -205,7 +217,7 @@
       const p = this.player(id);
       if (!p) return;
       if (typeof s.aim === 'number' && Number.isFinite(s.aim)) p.aim = s.aim;
-      p.fire = !!s.fire;
+      p.fire = !!s.fire && p.weapon !== 'sniper';     // ná: người chơi chỉ bắn khi nhả nút ngắm (sim.snipe), không bắn theo trạng thái giữ
       const locked = !p.alive || this.phase !== 'fight' || p.freezeUntil > this.t || this.t < p.lockUntil;
       if (locked) { p.vx = p.vz = 0; p.lastSet = now || 0; return; }
       let nx = s.x, nz = s.z;
@@ -264,6 +276,11 @@
         }
         if (p.reloadUntil && t >= p.reloadUntil) { p.ammo = C.RIFLE.mag; p.reloadUntil = 0; }
         if (p.power > 0 && t >= p.powerUntil) { p.power = 0; p.powerUntil = 0; this.emit({ t: 'power_end', id: p.id }); }   // hết 5s: mất sức mạnh
+        // ná của người chơi: yêu cầu bắn (nhả nút ngắm) được giữ lại vài phần giây, bắn ngay khi hồi xong
+        if (p.snipeReq) {
+          if (p.weapon !== 'sniper' || t > p.snipeReq.until) p.snipeReq = null;
+          else if (t >= p.nextSnipe) { p.aim = p.snipeReq.aim; p.snipeReq = null; this.shootSnipe(p); continue; }
+        }
         if (!p.fire) continue;      // đang bị đóng băng vẫn bắn được (chỉ không di chuyển được)
         if (p.weapon === 'rifle') {
           if (p.ammo > 0 && !p.reloadUntil && t >= p.nextRifle) this.shootRifle(p);
@@ -291,7 +308,7 @@
       p.x = pt.x; p.z = pt.z; p.vx = p.vz = 0; p.hp = p.hpMax = Math.min(this.hpBase, this.hpCap()); p.alive = true; p.respawnAt = 0; p.speedUntil = 0;
       p.aim = Math.atan2(-pt.x, -pt.z);                      // quay về giữa sân
       p.ammo = C.RIFLE.mag; p.reloadUntil = 0; p.nextRifle = t + 0.3; p.nextSnipe = t + 0.3;
-      p.power = 0; p.powerUntil = 0; p.freezeUntil = 0; p.fire = false;
+      p.power = 0; p.powerUntil = 0; p.freezeUntil = 0; p.fire = false; p.snipeReq = null;
       p.shieldUntil = t + C.SPAWN_SHIELD; p.lockUntil = t + 0.4;   // 0,4s bỏ qua vị trí cũ do máy khách gửi trễ
       this.emit({ t: 'respawn', id: p.id, x: p.x, z: p.z, aim: p.aim, shield: C.SPAWN_SHIELD, hp: p.hp });
     }
@@ -552,7 +569,7 @@
     snapshot() {
       return Object.assign(this.state(), {
         sd: this.sudden,
-        livesMax: this.livesMax, hpBase: this.hpBase, bombs: this.bombs.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, fall: b.fall, left: Math.max(0, +(b.land - this.t).toFixed(2)) })), sel: Math.max(0, +(this.selectEnd - this.t).toFixed(2)),
+        livesMax: this.livesMax, hpBase: this.hpBase, rw: this.randomWeapon, bombs: this.bombs.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, fall: b.fall, left: Math.max(0, +(b.land - this.t).toFixed(2)) })), sel: Math.max(0, +(this.selectEnd - this.t).toFixed(2)),
         pickups: this.pickups.map((q) => ({ id: q.id, type: q.type, x: q.x, z: q.z, life: Math.max(0, +(q.until - this.t).toFixed(1)) })),
         bullets: this.bullets.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, bounces: b.bounces })),
         broken: this.map.obstacles.map((o, i) => o.broken ? { i, w: o.w, d: o.d, r: o.r, gone: !!o.gone } : null).filter(Boolean),

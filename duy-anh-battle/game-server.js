@@ -58,7 +58,7 @@ const humansOnline = (room) => room.members.filter((m) => players.get(m.pid) && 
 
 function roomState(room) {
   return {
-    t: 'room_state', code: room.code, mode: room.mode, quick: room.quick, hostId: room.hostId,
+    t: 'room_state', code: room.code, mode: room.mode, quick: room.quick, priv: !!room.priv, hostId: room.hostId,
     settings: room.settings, fillBots: room.fillBots, botLevel: room.botLevel, inMatch: room.inMatch,
     players: room.members.map((m) => {
       const p = players.get(m.pid);
@@ -87,13 +87,13 @@ function pickTeam(room) {
 function fixSettings(mode, s) {
   let lives = s.lives;
   if (mode !== '2v2' && lives === 22) lives = 11;
-  return { venue: s.venue, lives, hp: cfg.normHp(s.hp) };
+  return { venue: s.venue, lives, hp: cfg.normHp(s.hp), rw: !!s.rw };
 }
 
-function createRoom(host, mode, settings, quick) {
+function createRoom(host, mode, settings, quick, priv) {
   leaveRoom(host);
   const room = {
-    code: genCode(), mode, settings, hostId: host.pid, fillBots: false, botLevel: 'pro', quick: !!quick,
+    code: genCode(), mode, settings, hostId: host.pid, fillBots: false, botLevel: 'pro', quick: !!quick, priv: !!priv,
     members: [], spectators: new Set(), match: null, inMatch: false, rematch: new Set(), lobbyTimers: new Map(),
   };
   rooms.set(room.code, room);
@@ -185,7 +185,7 @@ function startMatch(room) {
     }
   }
   const seed = (Math.random() * 1e9) | 0;
-  const m = new Sim({ map: room.settings.venue, teamSize: size, lives: room.settings.lives, hp: room.settings.hp, seed, players: plist });
+  const m = new Sim({ map: room.settings.venue, teamSize: size, lives: room.settings.lives, hp: room.settings.hp, seed, players: plist, randomWeapon: !!room.settings.rw });
   const M = { id: ++matchSeq, m, roster, bots: [], timers: new Map(), running: true, lastT: now(), lastState: 0, startTimer: null };
   roster.filter((r) => r.isBot).forEach((r, i) => {
     M.bots.push({ id: r.id, brain: new BotBrain(m, r.id, room.botLevel, Shooter.mulberry32(seed + i + 1)) });
@@ -288,6 +288,35 @@ function dequeue(p) {
   }
   return false;
 }
+/* ---------------- danh sách phòng đang mở (để "dò trận") ---------------- */
+function isOpenRoom(room, mode) {
+  return !room.quick && !room.priv && !room.inMatch && (!mode || room.mode === mode) &&
+    !!pickTeam(room) && humansOnline(room).length > 0;
+}
+function findOpenRoom(mode) {
+  let best = null;
+  for (const room of rooms.values()) {
+    if (!isOpenRoom(room, mode)) continue;
+    if (!best || room.members.length > best.members.length) best = room;
+  }
+  return best;
+}
+function listRooms() {
+  const open = [], live = [];
+  for (const room of rooms.values()) {
+    const names = room.members.map((m) => { const q = players.get(m.pid); return q ? q.name : '?'; });
+    if (isOpenRoom(room)) {
+      const host = players.get(room.hostId);
+      open.push({ code: room.code, mode: room.mode, host: host ? host.name : '?', hostChar: host ? host.char : '',
+        count: room.members.length, size: sizeOf(room) * 2, settings: room.settings, fillBots: room.fillBots, names });
+    } else if (room.match && room.match.running) {
+      live.push({ code: room.code, mode: room.mode, names, settings: room.settings });
+    }
+  }
+  open.sort((a, b) => (b.count - a.count) || a.code.localeCompare(b.code));
+  return { t: 'rooms', open: open.slice(0, 30), live: live.slice(0, 20) };
+}
+
 function launchQuick(mode, list, fill) {
   const host = players.get(list[0].pid);
   const room = createRoom(host, mode, { venue: cfg.MAPS[(Math.random() * cfg.MAPS.length) | 0].id, lives: 5, hp: cfg.C.HP }, true);
@@ -297,13 +326,30 @@ function launchQuick(mode, list, fill) {
   for (const mem of room.members) sendP(players.get(mem.pid), roomState(room));
   startMatch(room);
 }
-setInterval(() => {
+function matchmake() {
   for (const mode of ['1v1', '2v2']) {
     const q = queues[mode], need = mode === '2v2' ? 4 : 2;
-    if (q.length >= need) { const list = q.splice(0, need); launchQuick(mode, list, false); broadcastQueue(mode); }
-    else if (mode === '2v2' && q.length >= 2 && Date.now() - q[0].t > 10000) { const list = q.splice(0, q.length); launchQuick(mode, list, true); }
+    // 1) ưu tiên vào phòng đang mở của người khác (phòng do "Tạo phòng" lập)
+    for (const e of q.slice()) {
+      const p = players.get(e.pid);
+      if (!p || !p.conn) continue;
+      const room = findOpenRoom(mode);
+      if (!room) break;
+      queues[mode] = queues[mode].filter((x) => x.pid !== e.pid);
+      if (p.room) leaveRoom(p, true);
+      addMember(room, p);
+      const mem = member(room, p.pid); if (mem) mem.ready = true;       // đã chủ động tìm trận nên coi như sẵn sàng
+      sendP(p, { t: 'queue_status', waiting: false });
+      pushRoomState(room);
+      sysChat(room, p.name + ' đã vào phòng (tìm trận)');
+    }
+    // 2) ghép những người cùng đang chờ với nhau
+    const q2 = queues[mode];
+    if (q2.length >= need) { const list = q2.splice(0, need); launchQuick(mode, list, false); broadcastQueue(mode); }
+    else if (mode === '2v2' && q2.length >= 2 && Date.now() - q2[0].t > 10000) { const list = q2.splice(0, q2.length); launchQuick(mode, list, true); }
   }
-}, 1000).unref();
+}
+setInterval(matchmake, 1000).unref();
 
 /* ---------------- xử lý thông điệp ---------------- */
 function handle(conn, m) {
@@ -344,13 +390,16 @@ function handle(conn, m) {
       dequeue(p);
       queues[m.mode].push({ pid: p.pid, t: Date.now() });
       broadcastQueue(m.mode);
+      matchmake();                       // thử ghép ngay, khỏi chờ nhịp 1 giây
       break;
     }
+    case 'rooms_list': sendP(p, listRooms()); break;
     case 'queue_leave': if (dequeue(p)) sendP(p, { t: 'queue_status', waiting: false }); break;
     case 'room_create': {
       dequeue(p);
-      const room = createRoom(p, m.mode, fixSettings(m.mode, m.settings), false);
+      const room = createRoom(p, m.mode, fixSettings(m.mode, m.settings), false, !!m.priv);
       pushRoomState(room);
+      if (!room.priv) matchmake();       // ai đang "Tìm trận" sẽ được kéo vào phòng này ngay
       break;
     }
     case 'room_join': {
@@ -406,6 +455,11 @@ function handle(conn, m) {
     case 'pick': {
       const room = p.room, M = room && room.match; if (!M || !M.running) return;
       M.m.pick(p.pid, m.w);        // chỉ nhận trong 5 giây đầu ván
+      break;
+    }
+    case 'snipe': {
+      const room = p.room, M = room && room.match; if (!M || !M.running) return;
+      M.m.snipe(p.pid, m.aim);
       break;
     }
     case 'input': {

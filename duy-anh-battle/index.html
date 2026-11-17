@@ -72,6 +72,9 @@
             <div class="opt-row"><span class="opt-l">Số mạng</span>
               <div><div class="seg" id="setup-lives"><button data-v="5" class="sel">5 mạng</button><button data-v="7">7 mạng</button><button data-v="11">11 mạng</button><button data-v="22" class="hidden">22 mạng</button></div>
               <p class="note">Mỗi bên có từng đó mạng, hết mạng trước thì thua. Đấu đôi dùng chung mạng của đội (có thêm mức 22). Bị hạ sẽ hồi sinh ngẫu nhiên và bất tử 2 giây.</p></div></div>
+            <div class="opt-row"><span class="opt-l">Vũ khí</span>
+              <div><div class="seg" id="setup-rw"><button data-v="pick">Tự chọn</button><button data-v="rnd">🎲 Ngẫu nhiên</button></div>
+              <p class="note">Ngẫu nhiên: đầu mỗi trận máy quay chọn súng cho mọi người, chọn 1 lần rồi khóa cả trận. Tự chọn: bạn tự chọn trong 5 giây đầu.</p></div></div>
             <div class="opt-row"><span class="opt-l">Máu mỗi trận</span>
               <div><input type="number" id="setup-hp" class="num-in" min="100" max="1000" step="10" inputmode="numeric" placeholder="100">
               <p class="note">Nhập từ 100 đến 1000 máu cho mỗi người mỗi lần xuất hiện. Để trống = 100 máu.</p></div></div>
@@ -117,7 +120,8 @@
         <tr><th>Hành động</th><th>Bàn phím + chuột</th><th>Tay cầm</th><th>Điện thoại</th></tr>
         <tr><td>Di chuyển</td><td>W A S D</td><td>Cần trái</td><td>Cần trái</td></tr>
         <tr><td>Ngắm</td><td>Di chuột (hoặc ← ↑ → ↓)</td><td>Cần phải</td><td>Cần phải</td></tr>
-        <tr><td>Bắn</td><td>Bấm chuột / Space / J</td><td>RT / RB</td><td>Giữ cần phải</td></tr>
+        <tr><td>Bắn (súng nước)</td><td>Giữ chuột / Space / J</td><td>RT / RB</td><td>Giữ cần phải</td></tr>
+        <tr><td>Bắn (ná cao su)</td><td>Giữ để ngắm, nhả để bắn · chuột phải / X = hủy</td><td>Giữ cần phải rồi nhả · B = hủy</td><td>Giữ cần phải, nhả để bắn · kéo cần về gần tâm rồi nhả = hủy</td></tr>
         <tr><td>Tạm dừng</td><td>Esc / P</td><td>Start</td><td>⏸</td></tr>
       </table>
       <ul class="rules">
@@ -126,7 +130,7 @@
         <li><b>Hồi sinh:</b> còn mạng thì hồi sinh ngẫu nhiên ở một chỗ trên bản đồ. Đầu ván và mỗi lần hồi sinh đều có <b>bất tử 2 giây</b>.</li>
         <li><b>Máu:</b> mỗi lần xuất hiện bạn có <b>100 máu</b>.</li>
         <li><b>💦 Súng nước:</b> 1 viên / 0,3 giây, băng 10 viên rồi thay đạn 0,5 giây, mất <b>10 máu</b>/viên. Đạn <b>không xuyên vật cản</b>, va chạm <b>3 lần</b>: 2 lần đầu <b>nảy</b>, lần thứ 3 đạn vỡ, nếu đập vào <b>vật cản</b> thì <b>phá mạnh</b> vật cản đó. Mỗi lần đạn <b>nảy</b> vào vật cản cũng làm <b>sứt nhẹ</b> (nửa nhát). Vật cản bé cần khoảng <b>3</b> viên, vật cản to cần khoảng <b>5</b> viên để phá hết (thu nhỏ dần rồi biến mất). <b>Tường bao quanh sân không bị phá.</b></li>
-        <li><b>🎯 Ná cao su:</b> 1 phát / 1,5 giây, mất <b>40 máu</b>/phát (3 phát hạ 1 người). Viên đá <b>bay thẳng 32 m/s</b> nên <b>có thể né được</b>, nhưng <b>xuyên mọi vật cản</b> và mọi kẻ địch trên đường bay. Nhớ <b>ngắm đón đầu</b> khi đối thủ đang chạy.</li>
+        <li><b>🎯 Ná cao su:</b> 1 phát / 1,5 giây, mất <b>40 máu</b>/phát (3 phát hạ 1 người). Viên đá <b>bay thẳng 32 m/s</b> nên <b>có thể né được</b>, nhưng <b>xuyên mọi vật cản</b> và mọi kẻ địch trên đường bay. Cách bắn: <b>giữ nút bắn để ngắm</b> (hiện đường ngắm dài tới mép tường bao, chỉ mình bạn thấy, và bạn đi chậm còn 80%), <b>nhả tay để bắn</b>. Muốn hủy: chuột phải / phím X / nút B, hoặc kéo cần về gần tâm rồi nhả. Nhả khi ná chưa hồi xong thì không bắn. Nhớ <b>ngắm đón đầu</b> khi đối thủ đang chạy.</li>
         <li><b>Vật phẩm:</b> cứ mỗi 3 giây có 1 vật phẩm ngẫu nhiên rơi xuống sân. Chạy qua để nhặt:
           <br>❤️ <b>Hồi máu</b> +10 · 💪 <b>Sức mạnh</b> +10 sát thương mỗi phát trong 2 giây (không cộng dồn, nhặt thêm chỉ tính lại 2 giây) · 🛡️ <b>Khiên</b> miễn sát thương 2 giây · ❄️ <b>Đóng băng</b> đối thủ không di chuyển được trong 1 giây (vẫn ngắm và bắn được).</li>
         <li><b>Đạn của đồng đội:</b> bay xuyên qua nhau, không gây sát thương cho đồng đội.</li>
@@ -149,7 +153,7 @@
         <h2>Tủ đồ</h2>
         <h3>Vũ khí</h3>
         <div class="seg" id="wd-weapon"><button data-v="rifle">💦 Súng nước</button><button data-v="sniper">🎯 Ná cao su</button></div>
-        <p class="note">Súng nước: 10 máu/viên, băng 10 viên, đạn nảy 2 lần rồi phá vật cản ở lần va chạm thứ 3 (3–5 viên phá hết 1 vật cản). Ná cao su: 40 máu/phát, 1 phát/1,5s, đạn bay 32 m/s xuyên vật cản. Đầu mỗi ván có 5 giây để chọn lại, sau đó khóa luôn.</p>
+        <p class="note">Súng nước: 10 máu/viên, băng 10 viên, đạn nảy 2 lần rồi phá vật cản ở lần va chạm thứ 3 (3–5 viên phá hết 1 vật cản). Ná cao su: 40 máu/phát, 1 phát/1,5s, đạn bay 32 m/s xuyên vật cản. Đầu mỗi ván có 5 giây để chọn lại, sau đó khóa luôn. Nếu bật chế độ "Vũ khí ngẫu nhiên" khi tạo trận thì máy sẽ chọn cho bạn.</p>
         <h3>Nhân vật</h3>
         <div class="char-grid mini" id="wd-chars"></div>
         <div id="wd-colors"></div>
@@ -271,6 +275,7 @@
       <div class="grid2">
         <div class="panel">
           <h3>Tìm trận nhanh</h3>
+          <p class="note">Tự vào phòng đang chờ của người khác, hoặc ghép với người cũng đang tìm.</p>
           <div class="btn-col">
             <button class="btn primary" data-queue="1v1">⚡ Tìm trận 1v1</button>
             <button class="btn primary" data-queue="2v2">⚡ Tìm trận 2v2</button>
@@ -280,6 +285,7 @@
             <button class="btn" data-create="1v1">＋ Tạo phòng 1v1</button>
             <button class="btn" data-create="2v2">＋ Tạo phòng 2v2</button>
           </div>
+          <label class="check priv"><input type="checkbox" id="create-priv"> 🔒 Phòng riêng (chỉ vào bằng mã, không hiện trong danh sách)</label>
           <div class="join-row">
             <input id="join-code" maxlength="4" placeholder="MÃ" autocomplete="off">
             <button class="btn" id="btn-join">Vào phòng</button>
@@ -295,6 +301,12 @@
           <div class="row-between"><h3>Bảng xếp hạng</h3><button class="btn tiny ghost" id="btn-live-refresh">↻</button></div>
           <ol class="list lb" id="lb-list"><li class="muted">…</li></ol>
         </div>
+      </div>
+      <div class="panel rooms-panel">
+        <div class="row-between"><h3>Phòng đang mở <small>(bấm Vào để chơi ngay)</small></h3><button class="btn tiny ghost" id="btn-rooms-refresh">↻ Làm mới</button></div>
+        <ul class="list rooms" id="rooms-open"><li class="muted">Đang dò phòng…</li></ul>
+        <h3>Trận đang diễn ra <small>(xem trực tiếp)</small></h3>
+        <ul class="list rooms" id="rooms-live"></ul>
       </div>
       <div class="btn-row">
         <button class="btn ghost" id="btn-online-back">← Menu</button>
@@ -333,6 +345,7 @@
             <img id="room-venue-thumb" class="venue-thumb hidden" alt="">
             <label>Số mạng <select id="room-lives"><option value="5">5 mạng</option><option value="7">7 mạng</option><option value="11">11 mạng</option><option value="22">22 mạng (đấu đôi)</option></select></label>
             <label>Máu mỗi trận <input type="number" id="room-hp" class="num-in" min="100" max="1000" step="10" inputmode="numeric" placeholder="100"></label>
+            <label class="check"><input type="checkbox" id="room-rw"> 🎲 Vũ khí ngẫu nhiên đầu trận (chọn 1 lần)</label>
             <label id="room-fill-wrap" class="check"><input type="checkbox" id="room-fill"> Thêm bot vào chỗ trống
               <select id="room-botlevel"><option value="rookie">Tập sự</option><option value="pro">Chuyên nghiệp</option><option value="ace">Cao thủ</option></select></label>
           </div>
@@ -395,9 +408,11 @@
   <!-- ========== CHỌN VŨ KHÍ (5 giây đầu ván) ========== -->
   <div id="pick" class="hidden">
     <div class="pick-card">
-      <h3>Chọn vũ khí</h3>
-      <p>Chốt sau <b id="pick-t">5</b> giây · hết giờ là khóa, không đổi được cả ván</p>
-      <div class="pick-row">
+      <h3 id="pick-title">Chọn vũ khí</h3>
+      <p id="pick-sub">Chốt sau <b id="pick-t">5</b> giây · hết giờ là khóa, không đổi được cả ván</p>
+      <p id="pick-sub-r" class="hidden">Máy chọn ngẫu nhiên cho mọi người · chọn 1 lần, khóa cả ván</p>
+      <div class="pick-roll hidden" id="pick-roll"><span class="pi" id="pick-roll-ic">🎲</span><b id="pick-roll-name"></b><small id="pick-roll-desc"></small></div>
+      <div class="pick-row" id="pick-row">
         <button data-w="rifle"><span class="pi">💦</span><b>Súng nước</b><small>10 máu/viên · 1 viên/0,3s<br>băng 10 viên · lần nảy thứ 3 phá vật cản</small></button>
         <button data-w="sniper"><span class="pi">🎯</span><b>Ná cao su</b><small>40 máu/phát · 1 phát/1,5s<br>đạn bay nhanh, xuyên vật cản</small></button>
       </div>
@@ -438,18 +453,18 @@
 
   <script src="./assets/three-r147.min.js"></script>
   <script src="./assets/RoomEnvironment.js"></script>
-  <script src="./assets/config.js?v=2"></script>
-  <script src="./assets/shooter.js?v=2"></script>
-  <script src="./assets/ai.js?v=2"></script>
-  <script src="./assets/protocol.js?v=3"></script>
+  <script src="./assets/config.js?v=3"></script>
+  <script src="./assets/shooter.js?v=3"></script>
+  <script src="./assets/ai.js?v=3"></script>
+  <script src="./assets/protocol.js?v=5"></script>
   <script src="./assets/audio.js?v=3"></script>
   <script src="./assets/guns.js?v=2"></script>
   <script src="./assets/kit.js?v=1"></script>
   <script src="./assets/character.js?v=2"></script>
   <script src="./assets/arena.js?v=2"></script>
-  <script src="./assets/input.js?v=2"></script>
+  <script src="./assets/input.js?v=3"></script>
   <script src="./assets/net.js?v=2"></script>
   <script src="./assets/voice.js?v=1"></script>
   <script src="./assets/ui.js?v=2"></script>
-  <script src="./assets/game.js?v=3"></script>
+  <script src="./assets/game.js?v=5"></script>
 </body></html>
