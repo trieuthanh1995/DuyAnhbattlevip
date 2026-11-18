@@ -8,13 +8,16 @@
   let muted = false, volume = 0.8;
   let ambWanted = { on: false, venue: null }, ambNodes = null;
   /* ---------- nhạc nền: 1 bản lặp vô hạn, không bao giờ dừng/khởi động lại giữa các trận ---------- */
+  // danh sách nhạc nền: id → { name, file }. Thêm bài mới: bỏ file vào assets/music rồi thêm 1 dòng ở đây (và 1 <option> trong #set-bgm của index.html)
+  const MUSIC_LISTS = { punk: { name: 'Punk', file: 'assets/music/bgm.mp3' }, onepiece: { name: 'One Piece', file: 'assets/music/onepiece.mp3' } };
+  let musicTrack = 'punk';
   let musicEl = null, musicOn = true, musicVol = 0.5, musicStarted = false;
   let duckM = 1, duckS = 1, duckTM = 1, duckTS = 1, duckTimer = 0;   // hạ nhạc / hiệu ứng khi có người đang nói thoại
   function musicEffVol() { return clamp(volume * musicVol * 1.6 * duckM, 0, 1); }
   function musicElement() {
     if (!musicEl) {
       try {
-        musicEl = new Audio('assets/music/bgm.mp3');
+        musicEl = new Audio(MUSIC_LISTS[musicTrack].file);
         musicEl.loop = true; musicEl.preload = 'auto'; musicEl.setAttribute('playsinline', '');
         musicEl.volume = musicEffVol();
       } catch (e) { musicEl = null; }
@@ -342,6 +345,16 @@
     setMusicOn(m) { musicOn = !!m; if (musicOn) musicStart(); else musicStop(); },
     setMusicVolume(v) { musicVol = clamp(+v || 0, 0, 1); if (musicEl) musicEl.volume = musicEffVol(); },
     get musicOn() { return musicOn; },
+    /** Chọn list nhạc nền ('punk' | 'onepiece'); đang phát thì đổi bài ngay */
+    setMusicTrack(id) {
+      if (!MUSIC_LISTS[id] || id === musicTrack) return;
+      musicTrack = id;
+      if (!musicEl) return;
+      const wasPlaying = !musicEl.paused;
+      try { musicEl.src = MUSIC_LISTS[id].file; musicEl.loop = true; musicEl.load(); } catch (e) { /* bỏ qua */ }
+      if (wasPlaying && musicOn) musicStart();
+    },
+    get musicTrack() { return musicTrack; },
     /** hit(power) kiểu cũ, hoặc hit(kind, quality, power) */
     hit(a, b, c) {
       if (typeof a === 'number' || a === undefined || a === null) return paddle('drive', 'good', a || 1);

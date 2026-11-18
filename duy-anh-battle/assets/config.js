@@ -23,8 +23,9 @@
     // Súng nước: 1 viên / 0,3s, băng 10 viên rồi thay đạn 0,5s, 10 máu/viên, không xuyên vật cản.
     // Đạn va chạm 3 lần: 2 lần đầu nảy, lần thứ 3 vỡ ra; nếu lần thứ 3 đập vào VẬT CẢN thì phá một phần vật cản đó (tường bao thì không).
     RIFLE: { dmg: 10, delay: 0.3, mag: 10, reload: 0.5, speed: 11, r: 0.17, bounces: 3, life: 10 },
-    // Ná cao su: 1 viên / 1,5s, 40 máu (3 phát hạ 1 người), đạn đá bay 32 m/s (né được), xuyên vật cản và mọi kẻ địch trên đường bay
-    SNIPER: { dmg: 40, delay: 1.5, speed: 32, range: 40, width: 0.16,
+    // Ná cao su: 1 viên / 1,5s, 40 máu (3 phát hạ 1 người), đạn đá bay 42 m/s, xuyên vật cản và mọi kẻ địch trên đường bay,
+    // đập vào tường bao thì NẢY LẠI 1 lần (bounces) rồi bay tiếp cho tới hết tầm range (tính tổng cả đi lẫn về). Mỗi người chỉ trúng 1 lần / viên.
+    SNIPER: { dmg: 40, delay: 1.5, speed: 42, range: 40, width: 0.16, bounces: 1,
       aimSlow: 0.6,        // đang giữ ngắm: đi chậm còn 60%
       cancelMag: 0.42,     // cần ngắm (cảm ứng / tay cầm) kéo về dưới mức này rồi nhả = hủy phát bắn
       buffer: 0.2,         // nhả tay sớm hơn lúc hồi xong tối đa 0,2s vẫn được nhớ phát bắn

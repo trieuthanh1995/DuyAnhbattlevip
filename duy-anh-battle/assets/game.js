@@ -12,7 +12,7 @@
   const hexStr = (n) => '#' + n.toString(16).padStart(6, '0');
 
   /* ================= Lưu trữ ================= */
-  const DEFAULT_SETTINGS = { quality: 'auto', volume: 80, music: true, sfx: true, musicVol: 50, aimline: true, shake: true, voiceVol: 200, voiceMic: 180 };
+  const DEFAULT_SETTINGS = { quality: 'auto', volume: 80, music: true, bgm: 'punk', sfx: true, musicVol: 50, aimline: true, shake: true, voiceVol: 200, voiceMic: 180 };
   const Save = {
     data: { wins: 0, losses: 0, char: 'bunny', level: 'pro', venue: 'candy', lives: 5, hp: 0, weapon: 'rifle', mode: 1, muted: false, name: '', deviceId: '', settings: {}, looks: {}, rw: false },
     load() {
@@ -224,6 +224,12 @@
         fx.burst(e.x, e.z, 0xffe27a, 6, 2.5, 0.6, 0.07);
         if (p) p.kick = 1.6;
         A.snipeShot();
+        break;
+      }
+      case 'sbounce': {
+        if (!stones) break;
+        const b = stones.rebound(e);
+        if (b) fx.burst(e.x, e.z, 0xffe27a, 8, 2.2, 0.5, 0.06);
         break;
       }
       case 'spop': {
@@ -648,7 +654,7 @@
       const sec = Math.ceil(left - 0.02);
       if (sec >= 1 && sec <= C.SELECT_TIME && sec !== ctl.selShown) { ctl.selShown = sec; if (sec <= 3) A.beep(false); }
     }
-    stones.update(dt, null);
+    stones.update(dt, { onBounce: (b) => fx.burst(b.x, b.z, 0xffe27a, 8, 2.2, 0.5, 0.06) });
     bullets.update(dt, t, {
       onBounce(b) { fx.burst(b.x, b.z, b.burstCol, 2, 1.2, 0.55, 0.05); if (Math.random() < 0.5) A.bubbleBounce(); },
       onPop(b) { fx.burst(b.x, b.z, b.burstCol, 4, 1.5, 0.55, 0.06); },
@@ -1018,6 +1024,7 @@
     A.setMuted(!st.sfx);
     A.setVolume(st.volume / 100);
     A.setMusicVolume(st.musicVol / 100);
+    A.setMusicTrack(st.bgm === 'onepiece' ? 'onepiece' : 'punk');
     A.setMusicOn(!!st.music);
   }
 
@@ -1134,6 +1141,8 @@
     });
     $('#set-music').checked = !!st.music;
     $('#set-music').onchange = () => { st.music = $('#set-music').checked; applyAudioSettings(); Save.save(); refreshMainStats(); };
+    $('#set-bgm').value = st.bgm === 'onepiece' ? 'onepiece' : 'punk';
+    $('#set-bgm').onchange = () => { st.bgm = $('#set-bgm').value; applyAudioSettings(); Save.save(); };
     $('#set-sfx').checked = !!st.sfx;
     $('#set-sfx').onchange = () => { st.sfx = $('#set-sfx').checked; applyAudioSettings(); Save.save(); refreshMainStats(); if (st.sfx) A.click(); };
     $('#set-musicvol').value = st.musicVol;
@@ -1370,7 +1379,7 @@
       case 'chat': addChat(m.name, m.text, m.sys); break;
       case 'match_start': startOnlineMatch(m); break;
       case 'sync': if (session) applySync(m.snapshot); break;
-      case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'spop': case 'obs_break': case 'hit': case 'dead': case 'respawn': case 'bpop':
+      case 'select_start': case 'fight': case 'shoot': case 'snipe': case 'spop': case 'sbounce': case 'obs_break': case 'hit': case 'dead': case 'respawn': case 'bpop':
       case 'bomb_throw': case 'bomb_boom': case 'sudden': case 'power_end':
       case 'pickup_spawn': case 'pickup_take': case 'pickup_expire': case 'match_end': case 'over': case 'paused': case 'resumed':
         if (session && session.matchId === m.matchId) applyEvent(m);

@@ -375,7 +375,7 @@
       const tr = new T.Mesh(this.trailGeo, new T.MeshBasicMaterial({ color: lin(0xffe27a), transparent: true, opacity: 0.55, blending: T.AdditiveBlending, depthWrite: false }));
       tr.scale.set(0.45, 0.45, 8); tr.position.z = -4.5; m.add(tr);   // vệt sáng dài ~1,6 m (đã bù tỉ lệ cha 0,2)
       m.rotation.y = Math.atan2(ux, uz);
-      const b = { id: e.id, x: e.x, z: e.z, ux, uz, v: sp, left: e.len != null ? e.len : (e.left != null ? e.left : C.SNIPER.range), mesh: m };
+      const b = { id: e.id, x: e.x, z: e.z, ux, uz, v: sp, left: e.len != null ? e.len : (e.left != null ? e.left : C.SNIPER.range), bn: e.bn ? { ux: e.bn.ux, uz: e.bn.uz, len: e.bn.len } : null, mesh: m };
       this.world.stage.add(m); this.list.set(e.id, b);
       if (catchUp > 0) this.advance(b, Math.min(catchUp, 0.5), null);
       m.position.set(b.x, 0.6, b.z);
@@ -384,7 +384,23 @@
     advance(b, dt, cb) {
       const d = Math.min(b.v * dt, b.left);
       b.x += b.ux * d; b.z += b.uz * d; b.left -= d;
-      if (b.left <= 1e-6) { this.remove(b.id); if (cb && cb.onEnd) cb.onEnd(b); }
+      if (b.left <= 1e-6) {
+        if (b.bn) {   // nảy lại ở tường bao
+          b.ux = b.bn.ux; b.uz = b.bn.uz; b.left = b.bn.len; b.bn = null;
+          b.mesh.rotation.y = Math.atan2(b.ux, b.uz);
+          if (cb && cb.onBounce) cb.onBounce(b);
+          return;
+        }
+        this.remove(b.id); if (cb && cb.onEnd) cb.onEnd(b);
+      }
+    }
+    /** Server báo viên đá vừa nảy: chỉnh lại vị trí/hướng cho khớp */
+    rebound(e) {
+      const b = this.list.get(e.id); if (!b) return null;
+      const sp = Math.hypot(e.vx, e.vz) || 1;
+      b.x = e.x; b.z = e.z; b.ux = e.vx / sp; b.uz = e.vz / sp; b.left = e.len; b.bn = null;
+      b.mesh.rotation.y = Math.atan2(b.ux, b.uz); b.mesh.position.set(b.x, 0.6, b.z);
+      return b;
     }
     update(dt, cb) {
       for (const b of Array.from(this.list.values())) {

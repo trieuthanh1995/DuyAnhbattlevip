@@ -22,7 +22,7 @@ Không cần cài thư viện nào. Chỉ cần Node.js 18 trở lên.
    - Súng nước: 1 viên / 0,3s, băng 10 viên rồi thay đạn 0,5s. 10 máu / viên. Không xuyên vật cản. Đạn va chạm 3 lần: 2 lần đầu nảy,
      lần thứ 3 đạn vỡ; nếu lần đó đập vào vật cản thì tính 1 nhát phá. Lần va chạm thứ 1 vào vật cản KHÔNG gây hại; lần thứ 2 sứt nửa nhát (C.BREAK.chip); lần thứ 3 tính trọn 1 nhát. Vật cản bé cần 3 nhát, to cần 5 nhát (theo diện tích) mới
      biến mất, trước đó thu nhỏ dần. Tường bao không bị phá.
-   - Ná cao su: 1 phát / 1,5s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 32 m/s (né được, cần ngắm đón đầu),
+   - Ná cao su: 1 phát / 1,5s, 40 máu (3 phát hạ 1 người). Đạn đá bay thẳng 42 m/s (cần ngắm đón đầu), đập tường bao thì nảy lại 1 lần (tổng tầm bay tối đa 40 m),
      xuyên mọi vật cản và mọi kẻ địch trên đường bay (mỗi người chỉ trúng 1 lần/viên). Người trúng thứ nhất chịu 100% sát thương, người thứ hai chỉ 50%.
      Cách bắn: GIỮ nút bắn để ngắm (hiện đường ngắm dài tới mép tường bao đầu tiên, chỉ mình bạn thấy, đi chậm còn 60%),
      NHẢ tay để bắn. Hủy: chuột phải / phím X / nút B tay cầm, hoặc kéo cần ngắm về gần tâm (dưới C.SNIPER.cancelMag) rồi nhả.

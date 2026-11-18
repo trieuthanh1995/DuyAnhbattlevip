@@ -2,7 +2,7 @@
  * Hệ tọa độ: mặt sân là mặt phẳng (x, z). Hướng ngắm `aim` (rad): hướng = (sin aim, cos aim).
  * Đội A xuất phát bên trái (x<0), đội B bên phải (x>0).
  * Sim phát sự kiện vào hàng đợi drain():
- *   select_start, fight, shoot, snipe (đạn ná bay), spop (đạn ná hết đường), obs_break (vật cản bị phá), hit, dead, respawn, bpop, pickup_spawn, pickup_take, pickup_expire, match_end, over, paused, resumed */
+ *   select_start, fight, shoot, snipe (đạn ná bay), sbounce (đạn ná nảy tường), spop (đạn ná hết đường), obs_break (vật cản bị phá), hit, dead, respawn, bpop, pickup_spawn, pickup_take, pickup_expire, match_end, over, paused, resumed */
 (function (root, factory) {
   const isNode = typeof module === 'object' && module.exports;
   const cfg = isNode ? require('./config.js') : root.PP;
@@ -329,11 +329,22 @@
       const S = C.SNIPER, dx = Math.sin(p.aim), dz = Math.cos(p.aim);
       p.nextSnipe = this.t + S.delay;
       const sx = p.x + dx * 0.55, sz = p.z + dz * 0.55;
-      const len = Math.min(S.range, rayToBounds(this.map, p.x, p.z, dx, dz));
+      const ray = rayToBounds(this.map, p.x, p.z, dx, dz);
+      const len = Math.min(S.range, ray);
+      // nảy lại 1 lần ở tường bao (nếu chạm tường trong tầm bắn và còn tầm để bay tiếp)
+      let bn = null;
+      if ((S.bounces || 0) > 0 && ray <= S.range && S.range - len > 0.5) {
+        const hx = p.x + dx * ray, hz = p.z + dz * ray, m = this.map, e = 1e-4;
+        let rdx = dx, rdz = dz;
+        if (Math.abs(hx) >= m.HW - e) rdx = -dx;
+        if (Math.abs(hz) >= m.HD - e) rdz = -dz;
+        const len2 = Math.min(S.range - len, rayToBounds(m, hx, hz, rdx, rdz));
+        if (len2 > 0.5) bn = { ux: +rdx.toFixed(5), uz: +rdz.toFixed(5), len: +len2.toFixed(3) };
+      }
       const st = { id: ++this.bid, owner: p.id, team: p.team, x: sx, z: sz, vx: dx * S.speed, vz: dz * S.speed,
-        dist: 0, len, dmg: this.dmgOf(p, S.dmg), hit: [] };
+        dist: 0, len, dmg: this.dmgOf(p, S.dmg), hit: [], bn };
       this.stones.push(st);
-      this.emit({ t: 'snipe', id: st.id, owner: p.id, x: st.x, z: st.z, vx: st.vx, vz: st.vz, len, dmg: st.dmg });
+      this.emit({ t: 'snipe', id: st.id, owner: p.id, x: st.x, z: st.z, vx: st.vx, vz: st.vz, len, dmg: st.dmg, bn });
     }
     updateStones(dt) {
       const S = C.SNIPER, rr = C.PLAYER_R + S.width;
@@ -356,7 +367,11 @@
           }
         }
         st.x += ux * step; st.z += uz * step; st.dist += step;
-        if (st.dist >= st.len - 1e-6) {
+        if (st.dist >= st.len - 1e-6 && st.bn) {      // chạm tường bao: nảy lại 1 lần
+          const bn = st.bn; st.bn = null;
+          st.vx = bn.ux * S.speed; st.vz = bn.uz * S.speed; st.len = bn.len; st.dist = 0;
+          this.emit({ t: 'sbounce', id: st.id, x: st.x, z: st.z, vx: st.vx, vz: st.vz, len: st.len });
+        } else if (st.dist >= st.len - 1e-6) {
           this.stones.splice(i, 1);
           this.emit({ t: 'spop', id: st.id, x: st.x, z: st.z });
         }
@@ -573,7 +588,7 @@
         pickups: this.pickups.map((q) => ({ id: q.id, type: q.type, x: q.x, z: q.z, life: Math.max(0, +(q.until - this.t).toFixed(1)) })),
         bullets: this.bullets.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, bounces: b.bounces })),
         broken: this.map.obstacles.map((o, i) => o.broken ? { i, w: o.w, d: o.d, r: o.r, gone: !!o.gone } : null).filter(Boolean),
-        stones: this.stones.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, left: Math.max(0, +(b.len - b.dist).toFixed(2)) })),
+        stones: this.stones.map((b) => ({ id: b.id, owner: b.owner, x: b.x, z: b.z, vx: b.vx, vz: b.vz, dmg: b.dmg, left: Math.max(0, +(b.len - b.dist).toFixed(2)), bn: b.bn || null })),
         ts: this.wall,
       });
     }
